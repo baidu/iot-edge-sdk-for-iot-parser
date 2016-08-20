@@ -1,0 +1,33 @@
+﻿	这个文件介绍如何安装IoT Edge SDK, 以及它所依赖的第三方库，该安装不支持SSL连接。
+	下面的步骤以ubuntu为例，不同版本的操作系统对应的命令可能有细微的差别。
+	
+	安装步骤：
+	1,安装git:
+		sudo apt-get install git
+
+	2,安装autoconf:
+		sudo apt-get install autoconf
+
+	3,安装libtool:
+		sudo apt-get install libtool
+
+	5,下载并安装cJSON:
+		git clone https://github.com/DaveGamble/cJSON.git
+		cd cJSON && sudo make install && cd ..
+
+	6,下载并安装libmodbus:
+		git clone https://github.com/stephane/libmodbus.git
+		cd libmodbus && ./autogen.sh && ./configure && sudo make install && cd ..
+
+	7,下载并安装paho.mqtt.c:
+		git clone https://github.com/eclipse/paho.mqtt.c.git
+		cp paho_Makefile_c paho.mqtt.c/Makefile
+		cd paho.mqtt.c && sudo make install && cd ..
+	
+	8,使前面安装的lib生效：
+		sudo ldconfig
+
+	9,编译IoT Edge SDK:
+		make
+
+	至此，网关程序bdModbusGateway应该生成在父目录了。可以直接./bdModbusGateway运行了。

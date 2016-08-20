@@ -1,0 +1,7 @@
+Copyright © 2016 Baidu, Inc. All Rights Reserved.
+
+This distribution has a binary dependency on paho.mqtt.c, which is available under the epl/edl License. The source code of paho.mqtt.c can be found at https://github.com/eclipse/paho.mqtt.c.
+
+This distribution has a binary dependency on cJson. The source code of cJson can be found at https://github.com/kbranigan/cJSON.
+
+This distribution has a binary dependency on libmodbus, which is available under the LGPL License. The source code of libmodbus can be found at https://github.com/stephane/libmodbus.

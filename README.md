@@ -1,2 +1,36 @@
-# iot-edge-sdk-for-iot-parser
-该程序为百度开放云Modbus解析服务配套的数据采集组件，运行在客户的内网中，负责采集客户的Modbus从站上的数据并且上传到云端。之后在云端进行解析和归档等
+Baidu modbus gateway
+====================
+
+Overview
+--------
+
+Baidu modbus gateway is a client program designed to run under user's 
+corporation network. It samples modbus data from user's modbus slave
+devices, and upload into the Baidu modbus parser service, to be parsed
+and archived.
+
+It receives admins configuration from the cloud via MQTT message, then
+execute the sampling tasks specified in the config, finally upload
+the modbus package to cloud service, via MQTT message again.
+
+Once Baidu modbus parser service receives a modbus package, it parse
+the package according parse rules user specified, so the data becomes
+readable.
+
+Finally, parsed modbus package is archived into BOS, for later use.
+
+Installation
+------------
+
+Though this program could work with SSL, people may not need it in
+order to prompt speed and reduce disk requirement, hence we have two
+install guide, for with and without SSL.
+
+For people who want SSL, please refer to withssl/install.txt.
+For people who don't want SSL, please refer to nossl/install.txt
+
+Documentation
+-------------
+
+A more detailed step by step guide could be found at [here](https://cloud.baidu.com/doc/Parser/index.html)
+
