@@ -137,10 +137,10 @@ int load_channel(Channel* conf)
         printf("the config file is not a valid json object, file=%s\n", CONFIG_FILE);
         return 0;
     }
-    mystrncpy(conf->endpoint, cJSON_GetObjectItem(root, "endpoint")->valuestring);
-    mystrncpy(conf->topic, cJSON_GetObjectItem(root, "topic")->valuestring);
-    mystrncpy(conf->user, cJSON_GetObjectItem(root, "user")->valuestring);
-    mystrncpy(conf->password, cJSON_GetObjectItem(root, "password")->valuestring);
+    mystrncpy(conf->endpoint, cJSON_GetObjectItem(root, "endpoint")->valuestring, MAX_LEN);
+    mystrncpy(conf->topic, cJSON_GetObjectItem(root, "topic")->valuestring, MAX_LEN);
+    mystrncpy(conf->user, cJSON_GetObjectItem(root, "user")->valuestring, MAX_LEN);
+    mystrncpy(conf->password, cJSON_GetObjectItem(root, "password")->valuestring, MAX_LEN);
 
     free(content);
     cJSON_Delete(root);
@@ -232,10 +232,10 @@ void init_mqtt_client_for_policy(SlavePolicy* policy)
             if (pch == NULL)
             {
                 pch = (Channel*) malloc(sizeof(Channel));
-                mystrncpy(pch->endpoint, policy->pubChannel.endpoint);
-                mystrncpy(pch->topic, policy->pubChannel.topic);
-                mystrncpy(pch->user, policy->pubChannel.user);
-                mystrncpy(pch->password, policy->pubChannel.password);
+                mystrncpy(pch->endpoint, policy->pubChannel.endpoint, MAX_LEN);
+                mystrncpy(pch->topic, policy->pubChannel.topic, MAX_LEN);
+                mystrncpy(pch->user, policy->pubChannel.user, MAX_LEN);
+                mystrncpy(pch->password, policy->pubChannel.password, MAX_LEN);
                 
                 g_shared_channel[i] = pch;
                 g_shared_mqtt_client[i] = new_client;
@@ -259,22 +259,22 @@ void init_mqtt_client_for_policy(SlavePolicy* policy)
 SlavePolicy* json_to_slave_poilicy(cJSON* root)
 {
     SlavePolicy* policy = new_slave_policy();
-    mystrncpy(policy->gatewayid, json_string(root, "gatewayid"));
+    mystrncpy(policy->gatewayid, json_string(root, "gatewayid"), UUID_LEN);
     policy->slaveid = json_int(root, "slaveid");
     int int_mode = json_int(root, "mode");
     policy->mode = (ModbusMode)int_mode;
-    mystrncpy(policy->ip_com_addr, json_string(root, "ip_com_addr"));
+    mystrncpy(policy->ip_com_addr, json_string(root, "ip_com_addr"), ADDR_LEN);
     policy->functioncode = (char)json_int(root, "functioncode");
     policy->start_addr = json_int(root, "start_addr");
     policy->length = json_int(root, "length");
     policy->interval = json_int(root, "interval");
-    mystrncpy(policy->trantable, json_string(root, "trantable"));
+    mystrncpy(policy->trantable, json_string(root, "trantable"), UUID_LEN);
         
     cJSON* cjch = cJSON_GetObjectItem(root, "pubChannel");
-    mystrncpy(policy->pubChannel.endpoint, json_string(cjch, "endpoint"));
-    mystrncpy(policy->pubChannel.topic, json_string(cjch, "topic"));
-    mystrncpy(policy->pubChannel.user, json_string(cjch, "user"));
-    mystrncpy(policy->pubChannel.password, json_string(cjch, "password"));
+    mystrncpy(policy->pubChannel.endpoint, json_string(cjch, "endpoint"), MAX_LEN);
+    mystrncpy(policy->pubChannel.topic, json_string(cjch, "topic"), MAX_LEN);
+    mystrncpy(policy->pubChannel.user, json_string(cjch, "user"), MAX_LEN);
+    mystrncpy(policy->pubChannel.password, json_string(cjch, "password"), MAX_LEN);
     policy->nextRun = time(NULL) + policy->interval;
 
     if (policy->mode == RTU)
@@ -526,7 +526,7 @@ void pack_pub_msg(SlavePolicy* policy, char* raw, char* dest)
     strftime(timestamp, 39, "%Y-%m-%d %X%z", info);
     cJSON_AddStringToObject(root, "timestamp", timestamp);
     char* text = cJSON_Print(root);
-    mystrncpy(dest, text);
+    mystrncpy(dest, text, BUFF_LEN);
     free(text);
     cJSON_Delete(root);
 }
@@ -553,7 +553,7 @@ void execute_policy(SlavePolicy* policy)
     {
         MQTTClient_message pubmsg = MQTTClient_message_initializer;
         MQTTClient_deliveryToken delivery_token;
-        char msgcontent[2048];
+        char msgcontent[BUFF_LEN];
         pack_pub_msg(policy, payload, msgcontent);
         pubmsg.payload = msgcontent;
         pubmsg.payloadlen = strlen(msgcontent);

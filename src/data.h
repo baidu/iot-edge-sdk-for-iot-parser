@@ -31,7 +31,8 @@ enum {
     MODBUS_DATA_COUNT = 248,
     MAX_CHANNEL = 256, 
     MAX_LEN = 512,
-    BUFF_LEN = 2018
+    BUFF_LEN = 2018,
+    ADDR_LEN = 64
 };
 
 // types
@@ -55,7 +56,7 @@ typedef struct SlavePolicy_t
     char gatewayid[UUID_LEN]; 		// the cloud logic gateway id, used to distinguish slaves
     int slaveid;
     ModbusMode mode;    			// tcp, rtu, ascii
-    char ip_com_addr[64];
+    char ip_com_addr[ADDR_LEN];
     char functioncode;
     int start_addr;
     int length;

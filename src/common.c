@@ -95,9 +95,9 @@ void log_debug(char* msg)
     } 
 }
 
-void mystrncpy(char* desc, const char* src)
+void mystrncpy(char* desc, const char* src, int len)
 {
-    snprintf(desc, strlen(src) + 1, "%s", src);
+    snprintf(desc, len, "%s", src);
 }
 
 int json_int(cJSON* root, char* item)

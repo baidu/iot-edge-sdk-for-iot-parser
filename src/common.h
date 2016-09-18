@@ -32,7 +32,7 @@ void toggle_debug();
 
 void log_debug(char* msg);
 
-void mystrncpy(char* desc, const char* src);
+void mystrncpy(char* desc, const char* src, int len);
 
 int json_int(cJSON* root, char* item);
 
