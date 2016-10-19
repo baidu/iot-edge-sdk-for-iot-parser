@@ -42,7 +42,7 @@ void init_modbus_context(SlavePolicy* policy)
     if (policy->mode == TCP)
     {
         char ip[256];
-        mystrncpy(ip, policy->ip_com_addr);
+        mystrncpy(ip, policy->ip_com_addr, ADDR_LEN);
         int len = strlen(ip);
         int i = 0;
         while (i < len && ip[i] != ':')
