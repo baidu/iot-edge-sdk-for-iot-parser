@@ -21,6 +21,7 @@
 
 	7,下载并安装paho.mqtt.c:
 		git clone https://github.com/eclipse/paho.mqtt.c.git
+		cp paho.mqtt.c/src/VersionInfo.h.in paho.mqtt.c/src/VersionInfo.h
 		cp paho_Makefile_c paho.mqtt.c/Makefile
 		cd paho.mqtt.c && sudo make install && cd ..
 	
