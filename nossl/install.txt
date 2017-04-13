@@ -11,24 +11,32 @@
 	3,安装libtool:
 		sudo apt-get install libtool
 
+	(下面的步骤假设本sdk是下载在目录 ~/iot-edge-sdk-for-iot-parser，如果你的目录不是这里，请把下面涉及到的地方都一一替换）
+	4,创建一个临时目录
+		mkdir ~/deps
+		
 	5,下载并安装cJSON:
+		cd ~/deps
 		git clone https://github.com/DaveGamble/cJSON.git
-		cd cJSON && sudo make install && cd ..
+		cd cJSON && sudo make install
 
 	6,下载并安装libmodbus:
+		cd ~/deps
 		git clone https://github.com/stephane/libmodbus.git
-		cd libmodbus && ./autogen.sh && ./configure && sudo make install && cd ..
+		cd libmodbus && ./autogen.sh && ./configure && sudo make install
 
 	7,下载并安装paho.mqtt.c:
+		cd ~/deps
 		git clone https://github.com/eclipse/paho.mqtt.c.git
 		cp paho.mqtt.c/src/VersionInfo.h.in paho.mqtt.c/src/VersionInfo.h
-		cp paho_Makefile_c paho.mqtt.c/Makefile
-		cd paho.mqtt.c && sudo make install && cd ..
+		cp ~/iot-edge-sdk-for-iot-parser/src/nossl/paho_Makefile_cs paho.mqtt.c/Makefile
+		cd paho.mqtt.c && sudo make install 
 	
 	8,使前面安装的lib生效：
 		sudo ldconfig
 
 	9,编译IoT Edge SDK:
+		cd ~/iot-edge-sdk-for-iot-parser/nossl
 		make
 
 	至此，网关程序bdModbusGateway应该生成在父目录了。可以直接./bdModbusGateway运行了。
