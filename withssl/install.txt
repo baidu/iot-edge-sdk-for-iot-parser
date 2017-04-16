@@ -1,7 +1,9 @@
 ﻿	这个文件介绍如何安装IoT Edge SDK, 以及它所依赖的第三方库，并且支持SSL连接。
 	下面的步骤以ubuntu为例，不同版本的操作系统对应的命令可能有细微的差别。
+	如果你的操作系统是ubuntu，请直接运行如下命令进行安装:
+	sudo sh install-ubuntu.sh
 	
-	安装步骤：
+	手动安装步骤：
 	1,安装git:
 		sudo apt-get install git
 
@@ -20,7 +22,7 @@
 	5,下载并安装cJSON:
 		cd ~/deps
 		git clone https://github.com/DaveGamble/cJSON.git
-		cd cJSON && sudo make install
+		cd cJSON && sudo make && sudo make install
 
 	6,下载并安装libmodbus:
 		cd ~/deps
