@@ -4,6 +4,19 @@ SCRIPT=$(readlink -f "$0")
 BASEDIR=$(dirname "$SCRIPT")
 echo $BASEDIR
 
+# 0, make sure gcc version >= 4.9
+gccver=$(gcc --version | grep ^gcc | sed 's/^.* //g')
+echo "gcc version:${gccver}"
+if [[ ${gccver} < 4.9 ]]; then
+	sudo add-apt-repository -y ppa:ubuntu-toolchain-r/test
+	sudo apt-get update
+	sudo apt-get --yes --force-yes install gcc-4.9
+
+	sudo ln -f -s /usr/bin/gcc-4.9 /usr/bin/gcc
+else
+	echo "gcc version is OK!"
+fi
+
 # 1, install git
 echo "1, install git"
 sudo apt-get --yes --force-yes install git

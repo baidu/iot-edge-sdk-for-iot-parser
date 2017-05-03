@@ -7,7 +7,7 @@
 #include "common.h"
 
 // cache at most 2048 messages, ring buffer
-enum {MSG_BUF_SIZE = 20};
+enum {MSG_BUF_SIZE = 2048};
 char* g_dataToSend[MSG_BUF_SIZE];
 int g_buffHead = 0;
 int g_buffSize = 0;
@@ -138,7 +138,7 @@ int sendAMessage(char*data, MQTTClient client, char* topic) {
 int sendData(char* data, GlobalVar* vars) {
 	// send data to the dataTopic
 
-	// if mqtt clinet is not in a good state, then cache the data for later send
+	// if mqtt client is not in a good state, then cache the data for later send
 	if (data == NULL) {
 		return -1;
 	}
