@@ -32,10 +32,10 @@ install guide, for with and without SSL.
 虽然该程序可以使用SSL与百度物接入通信，但你也可以选择不使用SSL加密通信，以减少对SSL库的依赖，以及减少计算量。所以我们有两个安装向导，分别对应需要SSL，和不需要SSL的场景。
 
 For people who want SSL, please refer to withssl/ubuntu-install.sh. Run it like: sudo /bin/bash ubuntu-install.sh
-对于需要SSL的用户，请参考withssl/ubuntu-install.sh。像这样运行: sudo /bin/bash ubuntu-install.sh
+对于需要SSL的用户，请参考withssl/ubuntu-install.sh。像这样运行: ```sudo /bin/bash ubuntu-install.sh```
 
 For people who don't want SSL, please refer to nossl/ubuntu-install.txt
-对于不需要SSL的用户，请参考nossl/ubuntu-install.sh。像这样运行: sudo /bin/bash ubuntu-install.sh
+对于不需要SSL的用户，请参考nossl/ubuntu-install.sh。像这样运行: ```sudo /bin/bash ubuntu-install.sh```
 
 Documentation
 -------------
