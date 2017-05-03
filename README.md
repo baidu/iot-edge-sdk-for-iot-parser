@@ -1,36 +1,20 @@
-Baidu modbus gateway
+百度物联网物解析网关
 ====================
 
-Overview
---------
+介绍
+----
+百度物联网物解析网关可以帮助用户采集Modbus/BACNet协议数据，并且通过百度物联网的MQTT协议上传到云端，然后可以在云端进行处理、归档、入库以及可视化。
+网关需要运行在与你的Modbus/BACNet设备相连或者想通的计算机或者开发板上，以便其能采集到相关数据。目前支持Linux操作系统，并且提供ubuntu的一键安装脚本。
 
-Baidu modbus gateway is a client program designed to run under user's 
-corporation network. It samples modbus data from user's modbus slave
-devices, and upload into the Baidu modbus parser service, to be parsed
-and archived.
-
-It receives admins configuration from the cloud via MQTT message, then
-execute the sampling tasks specified in the config, finally upload
-the modbus package to cloud service, via MQTT message again.
-
-Once Baidu modbus parser service receives a modbus package, it parse
-the package according parse rules user specified, so the data becomes
-readable.
-
-Finally, parsed modbus package is archived into BOS, for later use.
-
-Installation
+网关工作原理
 ------------
+网关从本地配置文件读取MQTT连接信息，并且订阅一个指定的MQTT主题，以接受数据采集策略。采集策略包括采集哪些设备的哪些数据、采集频率多少等等。数据采集到后，通过另外一个MQTT主题发布到物接入。
 
-Though this program could work with SSL, people may not need it in
-order to prompt speed and reduce disk requirement, hence we have two
-install guide, for with and without SSL.
+目录结构
+--------
+modbus: modbus网关
+bacnet: bacnet网关
 
-For people who want SSL, please refer to withssl/install.txt.
-For people who don't want SSL, please refer to nossl/install.txt
-
-Documentation
--------------
-
-A more detailed step by step guide could be found at [here](https://cloud.baidu.com/doc/Parser/index.html)
-
+安装
+----
+两个网关需要分别编译，安装步骤请参考相关的ubuntu-install*.sh文件。
