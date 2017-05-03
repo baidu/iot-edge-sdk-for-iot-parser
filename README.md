@@ -12,8 +12,8 @@
 
 目录结构
 --------
-modbus: modbus网关
-bacnet: bacnet网关
+ - modbus: modbus网关
+ - bacnet: bacnet网关
 
 安装
 ----
