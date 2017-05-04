@@ -17,12 +17,13 @@
 使用步骤
 -------
 在成功编译好bdBacnetGateway之后，请通过如下步骤使用：
+
 1，登录百度物接入(IoT Hub)，选择或者创建一套：实例、设备、身份、策略。策略中指定2个主题，一个用于下发采集策略(比如取名bacConfigTopic)，一个用于网关上传BACNet数据（比如取名bacDataTopic)，得到如下信息：
-	1) 实例地址
-	2) 用户名
-	3) 密码
-	4) 配置下发主题
-	5) 数据上传主题
+* `1) 实例地址`
+* `2) 用户名`
+* `3) 密码`
+* `4) 配置下发主题`
+* `5) 数据上传主题`
 
 2，在bdBacnetGateway同级目录下，创建名为gwconfig-bacnet.txt的文件，文件的格式如下：
 ```
@@ -89,31 +90,36 @@
 5，这时候，bdBacnetGateway应该能接受（或者读取）到数据采集策略，并且按照指定的间隔采集数据，并且将数据发布到步骤1中的数据上传主题。你可以通过订阅这个主题，检查数据是否正确上传。数据上传的格式示例如下：
 ```
 {
-	"bdBacVer":	1,
-	"device":	{
-		"instanceNumber":	134,
-		"ip":	null,
-		"broadcastIp":	null
-	},
-	"ts":	1493369528,
-	"data":	[{
-			"id":	"inst_2_analog-input_1_present-value_1",
-			"instance":	2,
-			"objType":	"analog-input",
-			"objInstance":	1,
-			"propertyId":	"present-value",
-			"index":	4294967295,
-			"type":	"Double",
-			"value":	"0.00000"
-		}, {
-			"id":	"inst_2_analog-output_1_present-value_1",
-			"instance":	2,
-			"objType":	"analog-output",
-			"objInstance":	1,
-			"propertyId":	"present-value",
-			"index":	4294967295,
-			"type":	"Double",
-			"value":	"4.00000"
-		}]
+    "bdBacVer": 1,
+    "device":   {
+        "instanceNumber":   134,
+        "ip":   null,
+        "broadcastIp":  null
+    },
+    "ts":   1493369528,
+    "data": [{
+            "id":   "inst_2_analog-input_1_present-value_1",
+            "instance": 2,
+            "objType":  "analog-input",
+            "objInstance":  1,
+            "propertyId":   "present-value",
+            "index":    4294967295,
+            "type": "Double",
+            "value":    "0.00000"
+        }, {
+            "id":   "inst_2_analog-output_1_present-value_1",
+            "instance": 2,
+            "objType":  "analog-output",
+            "objInstance":  1,
+            "propertyId":   "present-value",
+            "index":    4294967295,
+            "type": "Double",
+            "value":    "4.00000"
+        }]
 }
+```
+
+如果需要将上传的数据写入时序数据库(TSDB)的话，可以基于dataTopic创建规则引擎，并且使用如下SQL查询语句：
+```
+*, 'data' AS _TSDB_META.data_array, 'value' AS _TSDB_META.value_field, 'ts' AS _TSDB_META.global_time, 'id' AS _TSDB_META.point_metric, 'device.instanceNumber' AS _TSDB_META.global_tags.tag1, 'instance' AS _TSDB_META.point_tags.tag1, 'objType' AS _TSDB_META.point_tags.tag2, 'objInstance' AS _TSDB_META.point_tags.tag3, 'propertyId' AS _TSDB_META.point_tags.tag4
 ```
