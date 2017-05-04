@@ -43,3 +43,94 @@ Documentation
 A more detailed step by step guide could be found at [here](https://cloud.baidu.com/doc/Parser/index.html)
 物解析服务详细的使用文档，请参考[这里](https://cloud.baidu.com/doc/Parser/index.html)
 
+使用步骤
+--------
+在成功编译好bdModbusGateway之后，请通过如下步骤使用：
+
+1，登录百度天工物解析服务，新建一个网关。新建完成之后，点击网关右侧的**查看密钥**链接，复制对话框中全部内容。
+
+2，按照[文档](https://cloud.baidu.com/doc/Parser/index.html)的提示，继续完成：
+*`网关下面的子设备的创建`
+*`解析项目的创建` （如果希望解析后的数据存入时序数据库，请填写一个**目的地主题**，并且点击**快速创建存储至TSDB的规则引擎**一键创建)
+*`解析设置的创建`
+*`轮询规则的创建`
+
+3，回到你的网关程序所在的目录，在bdModbusGateway同级目录下，创建名为gwconfig.txt的文件，并将第1步复制的网关密钥粘贴进文件。文件的格式如下：
+```
+{
+"endpoint":"ssl://parser_endpoint1473673432475.mqtt.iot.gz.baidubce.com:1884",
+"topic":"mb_commandTopic_v21493783120844",
+"user":"parser_endpoint1473673432475/mb_thing_v21493783120844",
+"password":"gnPeOWRsoNfakedDonotUsesobJY2+c+VU1UJAAbBnjI="
+}
+```
+
+4，运行bdModbusGateway: ```./bdModbusGateway```
+
+5，点击解析项目或者网关页面里面的**全部生效**按钮。至此，所有需要你操作的步骤已经完成，其他事情系统自动会完成。
+
+在后台，系统会把数据采集策略，通过gwconfig.txt中的topic主题下发给网关，网关会将采集策略保存在policyCache.txt文件中，并且开始调度数据采集任务。采集到的数据，会通过采集策略里面指定的mqtt主题上传到天工云端。上传的数据格式如下：
+```
+{
+    "bdModbusVer": 1,
+    "gatewayid": "b7905963-c954-41b9-b53c-7cb4c1c8518a",
+    "trantable": "74633ecc-3de2-49d0-abd2-4058f2589426",
+    "modbus": {
+        "request": {
+            "functioncode": 3,
+            "slaveid": 1,
+            "startAddr": 0,
+            "length": 2
+        },
+        "response": "00000000",
+        "parsedResponse": null,
+        "error": null
+    },
+    "timestamp": "2016-10-23 22:07:17-0700"
+}
+```
+**modbus.request**为采集modbus使用的命令参数。
+**modbus.response**为网关采集到的原始modbus数据。
+**modbus.parsedResponse**为空，后面经过云端解析后，会填上。
+
+在云端解析之后，会变成如下格式（填上了modbus.parsedResponse）:
+```
+{
+    "bdModbusVer": 1,
+    "gatewayid": "b7905963-c954-41b9-b53c-7cb4c1c8518a",
+    "trantable": "74633ecc-3de2-49d0-abd2-4058f2589426",
+    "modbus": {
+        "request": {
+            "functioncode": 3,
+            "slaveid": 1,
+            "startAddr": 0,
+            "length": 2
+        },
+        "response": "00000000",
+        "parsedResponse": [
+            {
+                "desc": "chiller pressure",
+                "type": "INT",
+                "unit": "",
+                "value": "1",
+                "errno": 0
+            },
+            {
+                "desc": "water flow",
+                "type": "INT",
+                "unit": "",
+                "value": "2",
+                "errno": 0
+            }
+        ],
+        "error": null
+    },
+    "timestamp": "2016-10-23 22:07:17-0700"
+}
+```
+解析后的数据，根据解析项目里面的设置，会存入BOS或者目的地主题，如果对接了规则引擎写TSDB，后面还会写入TSDB。
+
+如果手工创建规则引擎将解析后的数据写入TSDB，请参考使用如下SQL查询语句：
+```
+ *, 'modbus.parsedResponse' AS _TSDB_META.data_array,  'value' AS _TSDB_META.value_field, 'timestamp' AS _TSDB_META.global_time, 'yyyy-MM-dd hh:mmsZ'  AS _TSDB_META.time_format, 'desc' AS _TSDB_META.point_metric, 'modbus.request.functioncode'  AS _TSDB_META.global_tags.tag1, 'modbus.request.slaveid' AS _TSDB_META.global_tags.tag2,  'gatewayid' AS _TSDB_META.global_tags.tag3
+```
