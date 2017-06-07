@@ -54,9 +54,22 @@ temperature_on_delta(const char *name, struct cJSON *desired) {
     }
 }
 
+void on_get_ack(cJSON *document) {
+
+}
+
+void on_update_ack(cJSON *document) {
+
+}
+
 void shadow_action_callback(ShadowAction action, ShadowAckStatus status, ShadowActionAck *ack, void *context) {
     log4c_category_log(category, LOG4C_PRIORITY_INFO, "action callback. action=%d, status=%d.", action, status);
     if (status == SHADOW_ACK_ACCEPTED) {
+        if (action == SHADOW_GET) {
+            on_get_ack(ack->accepted.document);
+        } else if (action == SHADOW_UPDATE) {
+            on_update_ack(ack->accepted.document);
+        }
         char *document = cJSON_Print(ack->accepted.document);
 //        log4c_category_log(category, LOG4C_PRIORITY_INFO, "ACCEPTED.");
         free(document);
@@ -98,10 +111,7 @@ int main() {
     rc = device_management_connect(client);
     check_return_code(rc);
 
-    ShadowProperty temperature;
-    temperature.key = "temperature";
-    temperature.cb = temperature_on_delta;
-    rc = device_management_shadow_register_delta(client, &temperature);
+    rc = device_management_shadow_register_delta(client, "temperature", temperature_on_delta);
     check_return_code(rc);
 
     cJSON *reported = cJSON_CreateObject();
@@ -111,7 +121,7 @@ int main() {
     cJSON_AddItemToObject(reported, "temperature", temp);
 
     int i = 0;
-    for(int i = 0; i < 100; ++i) {
+    for(int i = 0; i < 60; ++i) {
         sleep(1);
         if (desiredTemperature < 0) {
             continue;

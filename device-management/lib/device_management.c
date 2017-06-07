@@ -18,6 +18,7 @@
 */
 #include "device_management.h"
 #include "device_management_conf.h"
+#include "device_management_util.h"
 
 #define _GNU_SOURCE
 
@@ -30,6 +31,10 @@
 #include <zconf.h>
 #include <stdio.h>
 
+#define SUB_TOPIC_COUNT 7
+
+#define MAX_REQUEST_ID_LENGTH 64
+
 static const char *log4c_category_name = "device_management";
 
 static const char *REQUEST_ID_KEY = "requestId";
@@ -40,10 +45,13 @@ static const char *MESSAGE_KEY = "message";
 
 static const char *REPORTED = "reported";
 
+static const char *TOPIC_PREFIX = "baidu/iot/shadow";
+
+static volatile bool hasInit = false;
+
 static log4c_category_t *category = NULL;
 
-#define SUB_TOPIC_COUNT 5
-
+/* Memorize all topics device management uses so that we don't compose them each time. */
 typedef struct {
     char *update;
     char *updateAccepted;
@@ -51,39 +59,42 @@ typedef struct {
     char *get;
     char *getAccepted;
     char *getRejected;
+    char *delete;
+    char *deleteAccepted;
+    char *deleteRejected;
     char *delta;
     char *deltaRejected;
     char *subTopics[SUB_TOPIC_COUNT];
 } TopicContract;
 
 typedef struct {
-    ShadowProperty property;
-} PropertyTableElement;
+    const char *key; // key 可以为NULL，表示匹配根。
+    ShadowPropertyDeltaCallback cb; // 收到更新之后，会调用这个回调。
+} ShadowPropertyDeltaHandler;
 
+/* Manages shadow property handlers. It's a add-only collection. */
 typedef struct {
-    PropertyTableElement vault[MAX_SHADOW_PROPERTY];
+    ShadowPropertyDeltaHandler vault[MAX_SHADOW_PROPERTY_HANDLER];
     int index;
-    // This data ia accessed from MQTT client's callback.
+    /* This data is accessed from MQTT client's callback. */
     pthread_mutex_t mutex;
-} PropertyTable;
-
-#define REQUEST_ID_LENGTH 64
+} PropertyHandlerTable;
 
 typedef struct {
-    char requestId[REQUEST_ID_LENGTH];
+    char requestId[MAX_REQUEST_ID_LENGTH];
     ShadowAction action;
     ShadowActionCallback callback;
     void *callbackContext;
     time_t timestamp;
     uint8_t timeout;
     bool free;
-} InFlightRequest;
+} InFlightMessage;
 
 typedef struct {
-    InFlightRequest vault[MAX_IN_FLIGHT_REQUEST];
-    // This data ia accessed from MQTT client's callback.
+    InFlightMessage vault[MAX_IN_FLIGHT_MESSAGE];
+    /* This data is also accessed from MQTT client's callback. */
     pthread_mutex_t mutex;
-} InFlightRequestTable;
+} InFlightMessageList;
 
 typedef struct device_management_client_t {
     MQTTAsync mqttClient;
@@ -94,9 +105,8 @@ typedef struct device_management_client_t {
     char *password;
     char *deviceName;
     TopicContract *topicContract;
-    PropertyTable properties;
-    InFlightRequestTable requests;
-    timer_t timer;
+    PropertyHandlerTable properties;
+    InFlightMessageList messages;
     pthread_mutex_t mutex;
 } device_management_client_t;
 
@@ -107,16 +117,7 @@ typedef struct {
 
 static ClientGroup allClients;
 
-static pthread_t requestKeeper;
-
-static void
-exit_null_pointer();
-
-static void
-check_malloc_result(void *address);
-
-static void
-safeFree(char **pointer);
+static pthread_t inFlightMessageKeeper;
 
 static TopicContract *
 topic_contract_create(const char *deviceName);
@@ -131,13 +132,13 @@ static bool
 client_group_remove(ClientGroup *group, device_management_client_t *client);
 
 static void
-in_flight_request_house_keep_handle(device_management_client_t *c);
+in_flight_message_house_keep(device_management_client_t *c);
 
 static void *
-in_flight_request_house_keep(void *ignore);
+in_flight_message_house_keep_proc(void *ignore);
 
 static const char *
-request_get_request_id(const cJSON *root);
+message_get_request_id(const cJSON *payload);
 
 static bool
 device_management_is_connected(DeviceManagementClient client);
@@ -150,17 +151,17 @@ device_management_shadow_send_json(device_management_client_t *c, const char *to
                                    const char *requestId, cJSON *payload);
 
 static DmReturnCode
-device_management_shadow_send_request(DeviceManagementClient client, ShadowAction action, cJSON *payload,
-                                      ShadowActionCallback callback,
-                                      void *context, uint8_t timeout);
+device_management_shadow_send(DeviceManagementClient client, ShadowAction action, cJSON *payload,
+                              ShadowActionCallback callback,
+                              void *context, uint8_t timeout);
 
 static int
 device_management_shadow_handle_response(device_management_client_t *c, const char *requestId, ShadowAction action,
                                          ShadowAckStatus status,
-                                         cJSON *root);
+                                         cJSON *payload);
 
 static DmReturnCode
-device_management_delta_arrived(device_management_client_t *c, cJSON *root);
+device_management_delta_arrived(device_management_client_t *c, cJSON *payload);
 
 static void
 mqtt_on_connected(void *context, char *cause);
@@ -188,6 +189,11 @@ mqtt_on_delivery_complete(void *context, MQTTAsync_token token);
 
 DmReturnCode
 device_management_init() {
+    if (hasInit) {
+        log4c_category_log(category, LOG4C_PRIORITY_WARN, "already initialized.");
+        return SUCCESS;
+    }
+
     if (log4c_init()) {
         fprintf(stderr, "log4c init failed.\n");
         return FAILURE;
@@ -196,19 +202,27 @@ device_management_init() {
     category = log4c_category_new(log4c_category_name);
 
     log4c_category_log(category, LOG4C_PRIORITY_INFO, "initialized.");
-    // Dump current log4c configuration in case you can't find log output anywhere.
-//    FILE *fd = fopen("log4c.txt", "w");
-//    log4c_dump_all_instances(fd);
-//    fclose(fd);
+
+//    dump_log4c_conf();
 
     pthread_mutex_init(&(allClients.mutex), NULL);
-    pthread_create(&requestKeeper, NULL, in_flight_request_house_keep, NULL);
+    pthread_create(&inFlightMessageKeeper, NULL, in_flight_message_house_keep_proc, NULL);
 
     return SUCCESS;
 }
 
 DmReturnCode
 device_management_fini() {
+    if (!hasInit) {
+        printf("not initialized. no clean up needed.");
+        return SUCCESS;
+    }
+    hasInit = false;
+    // Destroy
+    pthread_cancel(inFlightMessageKeeper);
+
+    log4c_category_log(category, LOG4C_PRIORITY_INFO, "cleaned up.");
+
     // Destroy log4c.
     if (category != NULL) {
         log4c_category_delete(category);
@@ -226,7 +240,6 @@ device_management_create(DeviceManagementClient *client, const char *broker, con
     device_management_client_t *c = malloc(sizeof(device_management_client_t));
 
     // TODO: validate arguments.
-
     rc = MQTTAsync_create(&(c->mqttClient), broker, deviceName, MQTTCLIENT_PERSISTENCE_NONE, NULL);
 
     if (rc == EXIT_FAILURE) {
@@ -249,10 +262,10 @@ device_management_create(DeviceManagementClient *client, const char *broker, con
     // TODO: set context.
     c->properties.index = 0;
     pthread_mutex_init(&(c->properties.mutex), NULL);
-    for (i = 0; i < MAX_IN_FLIGHT_REQUEST; ++i) {
-        c->requests.vault[i].free = true;
+    for (i = 0; i < MAX_IN_FLIGHT_MESSAGE; ++i) {
+        c->messages.vault[i].free = true;
     }
-    pthread_mutex_init(&(c->requests.mutex), NULL);
+    pthread_mutex_init(&(c->messages.mutex), NULL);
     pthread_mutex_init(&(c->mutex), NULL);
     *client = c;
     client_group_add(&allClients, c);
@@ -303,14 +316,14 @@ device_management_shadow_update(DeviceManagementClient client, cJSON *reported, 
                                 void *context, uint8_t timeout) {
     DmReturnCode rc;
 
-    cJSON *root = cJSON_CreateObject();
+    cJSON *payload = cJSON_CreateObject();
 
-    cJSON_AddItemToObject(root, REPORTED, reported);
+    cJSON_AddItemToObject(payload, REPORTED, reported);
 
-    rc = device_management_shadow_send_request(client, SHADOW_UPDATE, root, callback, context, timeout);
+    rc = device_management_shadow_send(client, SHADOW_UPDATE, payload, callback, context, timeout);
 
-    cJSON_DetachItemViaPointer(root, reported);
-    cJSON_Delete(root);
+    cJSON_DetachItemViaPointer(payload, reported);
+    cJSON_Delete(payload);
 
     if (rc != SUCCESS) {
         log4c_category_log(category, LOG4C_PRIORITY_ERROR, "device_management_shadow_update rc=%d", rc);
@@ -322,11 +335,11 @@ DmReturnCode
 device_management_shadow_get(DeviceManagementClient client, ShadowActionCallback callback, void *context,
                              uint8_t timeout) {
     DmReturnCode rc;
-    cJSON *root = cJSON_CreateObject();
+    cJSON *payload = cJSON_CreateObject();
 
-    rc = device_management_shadow_send_request(client, SHADOW_GET, root, callback, context, timeout);
+    rc = device_management_shadow_send(client, SHADOW_GET, payload, callback, context, timeout);
 
-    cJSON_Delete(root);
+    cJSON_Delete(payload);
 
     if (rc != SUCCESS) {
         log4c_category_log(category, LOG4C_PRIORITY_ERROR, "device_management_shadow_get rc=%d", rc);
@@ -335,10 +348,26 @@ device_management_shadow_get(DeviceManagementClient client, ShadowActionCallback
 }
 
 DmReturnCode
-device_management_shadow_register_delta(DeviceManagementClient client, ShadowProperty *shadowProperty) {
+device_management_shadow_delete(DeviceManagementClient client, ShadowActionCallback callback, void *context,
+                             uint8_t timeout) {
+    DmReturnCode rc;
+    cJSON *payload = cJSON_CreateObject();
+
+    rc = device_management_shadow_send(client, SHADOW_DELETE, payload, callback, context, timeout);
+
+    cJSON_Delete(payload);
+
+    if (rc != SUCCESS) {
+        log4c_category_log(category, LOG4C_PRIORITY_ERROR, "device_management_shadow_delete rc=%d", rc);
+    }
+    return rc;
+}
+
+DmReturnCode
+device_management_shadow_register_delta(DeviceManagementClient client, const char *key, ShadowPropertyDeltaCallback cb) {
     DmReturnCode rc = SUCCESS;
 
-    if (client == NULL || shadowProperty == NULL || shadowProperty->cb == NULL) {
+    if (client == NULL || cb == NULL) {
         exit_null_pointer();
     }
 
@@ -349,11 +378,11 @@ device_management_shadow_register_delta(DeviceManagementClient client, ShadowPro
     device_management_client_t *c = client;
 
     pthread_mutex_lock(&(c->properties.mutex));
-    if (c->properties.index >= MAX_SHADOW_PROPERTY) {
-        rc = TOO_MANY_PROPERTY;
+    if (c->properties.index >= MAX_SHADOW_PROPERTY_HANDLER) {
+        rc = TOO_MANY_SHADOW_PROPERTY_HANDLER;
     } else {
-        c->properties.vault[c->properties.index].property.key = shadowProperty->key;
-        c->properties.vault[c->properties.index].property.cb = shadowProperty->cb;
+        c->properties.vault[c->properties.index].key = key == NULL ? NULL : strdup(key);
+        c->properties.vault[c->properties.index].cb = cb;
         c->properties.index++;
     }
     pthread_mutex_unlock(&(c->properties.mutex));
@@ -370,10 +399,10 @@ DmReturnCode device_management_destroy(DeviceManagementClient client) {
         log4c_category_log(category, LOG4C_PRIORITY_ERROR, "bad client.");
     } else {
         client_group_remove(&allClients, c);
-        safeFree(&(c->username));
-        safeFree(&(c->password));
-        safeFree(&(c->deviceName));
-        safeFree(&(c->errorMessage));
+        safe_free(&(c->username));
+        safe_free(&(c->password));
+        safe_free(&(c->deviceName));
+        safe_free(&(c->errorMessage));
         free(c->errorMessage);
         MQTTAsync_disconnect(c->mqttClient, NULL);
         MQTTAsync_destroy(&(c->mqttClient));
@@ -384,55 +413,46 @@ DmReturnCode device_management_destroy(DeviceManagementClient client) {
     return SUCCESS;
 }
 
-void
-check_malloc_result(void *address) {
-    if (address == NULL) {
-        log4c_category_log(category, LOG4C_PRIORITY_FATAL, "malloc failure");
-        exit(EXIT_FAILURE);
-    }
-}
-
-void safeFree(char **pointer) {
-    if (pointer != NULL && *pointer != NULL) {
-        free(*pointer);
-        *pointer = NULL;
-    }
-}
-
 TopicContract *
 topic_contract_create(const char *deviceName) {
     int rc;
     TopicContract *t = malloc(sizeof(TopicContract));
     check_malloc_result(t);
 
-    rc = asprintf(&(t->update), "baidu/iot/shadow/%s/update", deviceName);
-    rc = asprintf(&(t->updateAccepted), "baidu/iot/shadow/%s/update/accepted", deviceName);
-    rc = asprintf(&(t->updateRejected), "baidu/iot/shadow/%s/update/rejected", deviceName);
+    rc = asprintf(&(t->update), "%s/%s/update", TOPIC_PREFIX, deviceName);
+    rc = asprintf(&(t->updateAccepted), "%s/%s/update/accepted", TOPIC_PREFIX, deviceName);
+    rc = asprintf(&(t->updateRejected), "%s/%s/update/rejected", TOPIC_PREFIX, deviceName);
     t->subTopics[0] = t->updateAccepted;
     t->subTopics[1] = t->updateRejected;
 
-    rc = asprintf(&(t->get), "baidu/iot/shadow/%s/get", deviceName);
-    rc = asprintf(&(t->getAccepted), "baidu/iot/shadow/%s/get/accepted", deviceName);
-    rc = asprintf(&(t->getRejected), "baidu/iot/shadow/%s/get/rejected", deviceName);
+    rc = asprintf(&(t->get), "%s/%s/get", TOPIC_PREFIX, deviceName);
+    rc = asprintf(&(t->getAccepted), "%s/%s/get/accepted", TOPIC_PREFIX, deviceName);
+    rc = asprintf(&(t->getRejected), "%s/%s/get/rejected", TOPIC_PREFIX, deviceName);
     t->subTopics[2] = t->getAccepted;
     t->subTopics[3] = t->getRejected;
 
-    rc = asprintf(&(t->delta), "baidu/iot/shadow/%s/delta", deviceName);
-    rc = asprintf(&(t->deltaRejected), "baidu/iot/shadow/%s/delta/rejected", deviceName);
-    t->subTopics[4] = t->delta;
+    rc = asprintf(&(t->delete), "%s/%s/delete", TOPIC_PREFIX, deviceName);
+    rc = asprintf(&(t->deleteAccepted), "%s/%s/delete/accepted", TOPIC_PREFIX, deviceName);
+    rc = asprintf(&(t->deleteRejected), "%s/%s/delete/rejected", TOPIC_PREFIX, deviceName);
+    t->subTopics[4] = t->getAccepted;
+    t->subTopics[5] = t->getRejected;
+
+    rc = asprintf(&(t->delta), "%s/%s/delta", TOPIC_PREFIX, deviceName);
+    rc = asprintf(&(t->deltaRejected), "%s/%s/delta/rejected", TOPIC_PREFIX, deviceName);
+    t->subTopics[6] = t->delta;
 }
 
 void
 topic_contract_destroy(TopicContract *topics) {
     if (topics != NULL) {
-        safeFree(&(topics->update));
-        safeFree(&(topics->updateAccepted));
-        safeFree(&(topics->updateRejected));
-        safeFree(&(topics->get));
-        safeFree(&(topics->getAccepted));
-        safeFree(&(topics->getRejected));
-        safeFree(&(topics->delta));
-        safeFree(&(topics->deltaRejected));
+        safe_free(&(topics->update));
+        safe_free(&(topics->updateAccepted));
+        safe_free(&(topics->updateRejected));
+        safe_free(&(topics->get));
+        safe_free(&(topics->getAccepted));
+        safe_free(&(topics->getRejected));
+        safe_free(&(topics->delta));
+        safe_free(&(topics->deltaRejected));
         free(topics);
     }
 }
@@ -487,39 +507,41 @@ client_group_remove(ClientGroup *group, device_management_client_t *client) {
 
 
 void
-in_flight_request_house_keep_handle(device_management_client_t *c) {
+in_flight_message_house_keep(device_management_client_t *c) {
     int i;
     time_t now;
     time(&now);
-    pthread_mutex_lock(&(c->requests.mutex));
-    for (i = 0; i < MAX_IN_FLIGHT_REQUEST; ++i) {
-        if (!c->requests.vault[i].free) {
-            long elipse = difftime(now, c->requests.vault[i].timestamp);
-            if (elipse > c->requests.vault[i].timeout) {
-                if (c->requests.vault[i].callback != NULL) {
-                    c->requests.vault[i].callback(c->requests.vault[i].action, SHADOW_ACK_TIMEOUT, NULL,
-                                                  c->requests.vault[i].callbackContext);
+    pthread_mutex_lock(&(c->messages.mutex));
+    for (i = 0; i < MAX_IN_FLIGHT_MESSAGE; ++i) {
+        if (!c->messages.vault[i].free) {
+            long elipse = difftime(now, c->messages.vault[i].timestamp);
+            if (elipse > c->messages.vault[i].timeout) {
+                // TODO: how to log the request id.
+                log4c_category_log(category, LOG4C_PRIORITY_WARN, "request timed out.");
+                if (c->messages.vault[i].callback != NULL) {
+                    c->messages.vault[i].callback(c->messages.vault[i].action, SHADOW_ACK_TIMEOUT, NULL,
+                                                  c->messages.vault[i].callbackContext);
                 }
-                c->requests.vault[i].free = true;
+                c->messages.vault[i].free = true;
             }
         }
     }
 
-    pthread_mutex_unlock(&(c->requests.mutex));
+    pthread_mutex_unlock(&(c->messages.mutex));
 
 }
 
 void *
-in_flight_request_house_keep(void *ignore) {
+in_flight_message_house_keep_proc(void *ignore) {
     while (1) {
-        client_group_iterate(&allClients, in_flight_request_house_keep_handle);
+        client_group_iterate(&allClients, in_flight_message_house_keep);
         sleep(1);
     }
 }
 
 const char *
-request_get_request_id(const cJSON *root) {
-    cJSON *requestId = cJSON_GetObjectItemCaseSensitive(root, "requestId");
+message_get_request_id(const cJSON *payload) {
+    cJSON *requestId = cJSON_GetObjectItemCaseSensitive(payload, "requestId");
     return requestId->valuestring;
 }
 
@@ -530,14 +552,14 @@ exit_null_pointer() {
 }
 
 DmReturnCode
-in_flight_request_add(InFlightRequestTable *table, const char *requestId, ShadowAction action,
+in_flight_message_add(InFlightMessageList *table, const char *requestId, ShadowAction action,
                       ShadowActionCallback callback,
                       void *context, uint8_t timeout) {
-    int rc = TOO_MANY_REQUEST;
+    int rc = TOO_MANY_IN_FLIGHT_MESSAGE;
     int i;
 
     pthread_mutex_lock(&(table->mutex));
-    for (i = 0; i < MAX_IN_FLIGHT_REQUEST; ++i) {
+    for (i = 0; i < MAX_IN_FLIGHT_MESSAGE; ++i) {
         if (table->vault[i].free) {
             table->vault[i].free = false;
             table->vault[i].action = action;
@@ -545,7 +567,7 @@ in_flight_request_add(InFlightRequestTable *table, const char *requestId, Shadow
             table->vault[i].callbackContext = context;
             table->vault[i].timeout = timeout;
             time(&(table->vault[i].timestamp));
-            strncpy(table->vault[i].requestId, requestId, REQUEST_ID_LENGTH);
+            strncpy(table->vault[i].requestId, requestId, MAX_REQUEST_ID_LENGTH);
             rc = SUCCESS;
             break;
         }
@@ -600,7 +622,7 @@ device_management_shadow_send_json(device_management_client_t *c, const char *to
 
     rc = MQTTAsync_sendMessage(c->mqttClient, topic, &message, responseOptions);
     if (rc != MQTTASYNC_SUCCESS) {
-        log4c_category_log(category, LOG4C_PRIORITY_ERROR, "failed to send request. rc=%d, requestId=%s.", rc,
+        log4c_category_log(category, LOG4C_PRIORITY_ERROR, "failed to send message. rc=%d, requestId=%s.", rc,
                            requestId);
         dmrc = FAILURE;
     } else {
@@ -614,16 +636,16 @@ device_management_shadow_send_json(device_management_client_t *c, const char *to
 }
 
 DmReturnCode
-device_management_shadow_send_request(DeviceManagementClient client, ShadowAction action, cJSON *payload,
-                                      ShadowActionCallback callback,
-                                      void *context, uint8_t timeout) {
+device_management_shadow_send(DeviceManagementClient client, ShadowAction action, cJSON *payload,
+                              ShadowActionCallback callback,
+                              void *context, uint8_t timeout) {
     const char *topic;
 
     int rc;
     device_management_client_t *c = client;
 
     uuid_t uuid;
-    char requestId[REQUEST_ID_LENGTH];
+    char requestId[MAX_REQUEST_ID_LENGTH];
     uuid_generate(uuid);
     uuid_unparse(uuid, requestId);
 
@@ -632,13 +654,13 @@ device_management_shadow_send_request(DeviceManagementClient client, ShadowActio
     } else if (action == SHADOW_GET) {
         topic = client->topicContract->get;
     } else if (action == SHADOW_DELETE) {
-        topic = client->topicContract->delta;
+        topic = client->topicContract->delete;
     } else {
         log4c_category_log(category, LOG4C_PRIORITY_ERROR, "Unsupported action.");
-        return BAD_ARGUMENTS;
+        return BAD_ARGUMENT;
     }
 
-    rc = in_flight_request_add(&(c->requests), requestId, action, callback, context, timeout);
+    rc = in_flight_message_add(&(c->messages), requestId, action, callback, context, timeout);
     if (rc != SUCCESS) {
         return rc;
     }
@@ -651,54 +673,54 @@ device_management_shadow_send_request(DeviceManagementClient client, ShadowActio
 int
 device_management_shadow_handle_response(device_management_client_t *c, const char *requestId, ShadowAction action,
                                          ShadowAckStatus status,
-                                         cJSON *root) {
-    int rc = NO_MATCHING_IN_FLIGHT_REQUEST;
+                                         cJSON *payload) {
+    int rc = NO_MATCHING_IN_FLIGHT_MESSAGE;
     int i;
     ShadowActionAck ack;
 
-    pthread_mutex_lock(&(c->requests.mutex));
-    for (i = 0; i < MAX_IN_FLIGHT_REQUEST; ++i) {
-        if (!c->requests.vault[i].free &&
-            strncasecmp(c->requests.vault[i].requestId, requestId, REQUEST_ID_LENGTH) == 0) {
+    pthread_mutex_lock(&(c->messages.mutex));
+    for (i = 0; i < MAX_IN_FLIGHT_MESSAGE; ++i) {
+        if (!c->messages.vault[i].free &&
+            strncasecmp(c->messages.vault[i].requestId, requestId, MAX_REQUEST_ID_LENGTH) == 0) {
             if (status == SHADOW_ACK_ACCEPTED) {
-                ack.accepted.document = root;
+                ack.accepted.document = payload;
             } else if (status == SHADOW_ACK_REJECTED) {
-                ack.rejected.code = cJSON_GetObjectItem(root, CODE_KEY)->valuestring;
-                ack.rejected.message = cJSON_GetObjectItem(root, MESSAGE_KEY)->valuestring;
+                ack.rejected.code = cJSON_GetObjectItem(payload, CODE_KEY)->valuestring;
+                ack.rejected.message = cJSON_GetObjectItem(payload, MESSAGE_KEY)->valuestring;
             }
-            c->requests.vault[i].callback(action, status, &ack, c->requests.vault[i].callbackContext);
-            c->requests.vault[i].free = true;
+            c->messages.vault[i].callback(action, status, &ack, c->messages.vault[i].callbackContext);
+            c->messages.vault[i].free = true;
             rc = SUCCESS;
             break;
         }
     }
-    pthread_mutex_unlock(&(c->requests.mutex));
+    pthread_mutex_unlock(&(c->messages.mutex));
 
-    if (rc == NO_MATCHING_IN_FLIGHT_REQUEST) {
-        log4c_category_log(category, LOG4C_PRIORITY_WARN, "no in flight request matching %s.", requestId);
+    if (rc == NO_MATCHING_IN_FLIGHT_MESSAGE) {
+        log4c_category_log(category, LOG4C_PRIORITY_WARN, "no in flight payload matching %s.", requestId);
     }
     return rc;
 }
 
 DmReturnCode
-device_management_delta_arrived(device_management_client_t *c, cJSON *root) {
+device_management_delta_arrived(device_management_client_t *c, cJSON *payload) {
     uint32_t i = 0;
     UserDefinedError *error = NULL;
     cJSON *desired;
     cJSON *property;
 
-    const char *requestId = request_get_request_id(root);
+    const char *requestId = message_get_request_id(payload);
     log4c_category_log(category, LOG4C_PRIORITY_DEBUG, "received delta. requestId=%s.", requestId);
-    desired = cJSON_GetObjectItemCaseSensitive(root, "desired");
+    desired = cJSON_GetObjectItemCaseSensitive(payload, "desired");
 
     pthread_mutex_lock(&(c->properties.mutex));
     for (i = 0; i < c->properties.index; ++i) {
-        if (c->properties.vault[i].property.key == NULL) {
-            error = c->properties.vault[i].property.cb(NULL, desired);
+        if (c->properties.vault[i].key == NULL) {
+            error = c->properties.vault[i].cb(NULL, desired);
         } else {
-            property = cJSON_GetObjectItemCaseSensitive(desired, c->properties.vault[i].property.key);
+            property = cJSON_GetObjectItemCaseSensitive(desired, c->properties.vault[i].key);
             if (property != NULL) {
-                error = c->properties.vault[i].property.cb(c->properties.vault[i].property.key, property);
+                error = c->properties.vault[i].cb(c->properties.vault[i].key, property);
             }
         }
 
@@ -710,14 +732,14 @@ device_management_delta_arrived(device_management_client_t *c, cJSON *root) {
     pthread_mutex_unlock(&(c->properties.mutex));
 
     if (error != NULL) {
-        cJSON *request = cJSON_CreateObject();
-        cJSON_AddStringToObject(request, CODE_KEY, error->code);
-        cJSON_AddStringToObject(request, MESSAGE_KEY, error->message);
-        device_management_shadow_send_json(c, c->topicContract->deltaRejected, requestId, request);
+        cJSON *responsePayload = cJSON_CreateObject();
+        cJSON_AddStringToObject(responsePayload, CODE_KEY, error->code);
+        cJSON_AddStringToObject(responsePayload, MESSAGE_KEY, error->message);
+        device_management_shadow_send_json(c, c->topicContract->deltaRejected, requestId, responsePayload);
         if (error->destroyer != NULL) {
             error->destroyer(error);
         }
-        cJSON_Delete(request);
+        cJSON_Delete(responsePayload);
     }
 
     return SUCCESS;
@@ -725,14 +747,16 @@ device_management_delta_arrived(device_management_client_t *c, cJSON *root) {
 
 void
 mqtt_on_connected(void *context, char *cause) {
+    int i;
     int rc;
     MQTTAsync_responseOptions responseOptions;
     responseOptions.onSuccess = NULL;
     responseOptions.onFailure = NULL;
     device_management_client_t *c = context;
+
     // TODO: on-demand subscribe
     int qos[SUB_TOPIC_COUNT];
-    for (int i = 0; i < SUB_TOPIC_COUNT; ++i) {
+    for (i = 0; i < SUB_TOPIC_COUNT; ++i) {
         qos[i] = 1;
     }
     rc = MQTTAsync_subscribeMany(c->mqttClient, SUB_TOPIC_COUNT, c->topicContract->subTopics, qos, &responseOptions);
@@ -806,15 +830,15 @@ mqtt_on_message_arrived(void *context, char *topicName, int topicLen, MQTTAsync_
     }
     log4c_category_log(category, LOG4C_PRIORITY_TRACE, "\n[<<<<<<\ntopic:\n%s\npayload:\n%s\n <<<<<<]",
                        topicName, json);
-    cJSON *root = cJSON_Parse(json);
+    cJSON *payload = cJSON_Parse(json);
     if (json != message->payload) {
         free(json);
     }
     ShadowAckStatus status = SHADOW_ACK_ACCEPTED;
-    ShadowAction action = SHADOW_NULL;
+    ShadowAction action = SHADOW_INVALID;
 
     if (strncasecmp(c->topicContract->delta, topicName, strlen(c->topicContract->delta)) == 0) {
-        device_management_delta_arrived(c, root);
+        device_management_delta_arrived(c, payload);
     } else {
         if (strncasecmp(c->topicContract->updateAccepted, topicName, strlen(c->topicContract->updateAccepted)) ==
             0) {
@@ -834,19 +858,19 @@ mqtt_on_message_arrived(void *context, char *topicName, int topicLen, MQTTAsync_
             log4c_category_log(category, LOG4C_PRIORITY_ERROR, "Unexpected topic %s.", topicName);
         }
 
-        if (action != SHADOW_NULL) {
-            cJSON *requestId = cJSON_GetObjectItem(root, REQUEST_ID_KEY);
+        if (action != SHADOW_INVALID) {
+            cJSON *requestId = cJSON_GetObjectItem(payload, REQUEST_ID_KEY);
 
             if (requestId == NULL) {
                 log4c_category_log(category, LOG4C_PRIORITY_ERROR, "cannot find request id.");
             } else {
 
-                device_management_shadow_handle_response(c, requestId->valuestring, action, status, root);
+                device_management_shadow_handle_response(c, requestId->valuestring, action, status, payload);
             }
         }
     }
 
-    cJSON_Delete(root);
+    cJSON_Delete(payload);
     MQTTAsync_freeMessage(&message);
     MQTTAsync_free(topicName);
 
