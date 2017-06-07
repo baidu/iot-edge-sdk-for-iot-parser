@@ -43,67 +43,61 @@ typedef enum {
     SUCCESS = 0,
     FAILURE = -1,
     NULL_POINTER = -2,
+    /* 物管理客户端未连接 */
     NOT_CONNECTED = -3,
-    TOO_MANY_PROPERTY = -4,
-    BAD_ARGUMENTS = -5,
-    TOO_MANY_REQUEST = -6,
-    NO_MATCHING_IN_FLIGHT_REQUEST = -7,
+    /* 尝试注册超过上限（由 MAX_SHADOW_PROPERTY_HANDLER 定义）的 handler */
+    TOO_MANY_SHADOW_PROPERTY_HANDLER = -4,
+    BAD_ARGUMENT = -5,
+    TOO_MANY_IN_FLIGHT_MESSAGE = -6,
+    NO_MATCHING_IN_FLIGHT_MESSAGE = -7,
 } DmReturnCode;
 
 typedef enum {
     SHADOW_GET,
     SHADOW_UPDATE,
     SHADOW_DELETE,
-    SHADOW_NULL,
+    /* 表示一个不合法的 shadow action */
+    SHADOW_INVALID,
 } ShadowAction;
 
 typedef enum {
     SHADOW_ACK_ACCEPTED,
     SHADOW_ACK_REJECTED,
+    /* 在一定时间内没有收到服务器端的 accepted/rejected */
     SHADOW_ACK_TIMEOUT,
 } ShadowAckStatus;
 
-typedef struct {
-    const char *code;
-    const char *message;
-} ShadowAckError;
-
-typedef struct {
-    const char *code;
-    const char *message;
-    void (*destroyer)(void *error); // Handler to free this error.
-} UserDefinedError;
-
+/* 如果 GET/UPDATE 被服务器端接受，就会返回一个完整的影子文档 */
 typedef struct {
     cJSON *document;
 } ShadowActionAccepted;
 
+typedef struct {
+    const char *code;
+    const char *message;
+} ShadowActionRejected;
+
 typedef union {
     ShadowActionAccepted accepted;
-    ShadowAckError rejected;
+    ShadowActionRejected rejected;
 } ShadowActionAck;
+
+typedef struct {
+    const char *code;
+    const char *message;
+    /* 如何释放这个 error */
+    void (*destroyer)(void *error);
+} UserDefinedError;
 
 typedef void (*ShadowActionCallback)(ShadowAction action, ShadowAckStatus status,
                                      ShadowActionAck *ack, void *context);
 
-typedef UserDefinedError *(*ShadowPropertyCallback)(const char *name, struct cJSON *desired);
-
-typedef struct {
-    const char *key; // key 可以为NULL，表示匹配根。
-    ShadowPropertyCallback cb; // 收到更新之后，会调用这个回调。
-} ShadowProperty;
-
-typedef struct {
-    cJSON *reported;
-    cJSON *desired;
-    long timestamp;
-    int version;
-} ShadowDocument;
-
-typedef struct {
-    const char *error_code;
-    const char *error_message;
-} DeviceError;
+/**
+ * @param name 发生改变属性的名称
+ * @param desired 发生改变属性的期待值
+ * @return 返回一个错误，表示无法按期待值改变属性。否则返回 NULL。
+ */
+typedef UserDefinedError *(*ShadowPropertyDeltaCallback)(const char *name, struct cJSON *desired);
 
 struct device_management_client_t;
 
@@ -159,16 +153,25 @@ DmReturnCode
 device_management_shadow_get(DeviceManagementClient client, ShadowActionCallback callback, void *context,
                              uint8_t timeout);
 
-
 /**
- * @brief
- *
+ * @brief 删除设备影子
  * @param client
- * @param shadowProperty
+ * @param data
  * @return
  */
 DmReturnCode
-device_management_shadow_register_delta(DeviceManagementClient client, ShadowProperty *shadowProperty);
+device_management_shadow_delete(DeviceManagementClient client, ShadowActionCallback callback, void *context,
+                             uint8_t timeout);
+
+/**
+ * @brief 为某一个属性注册一个回调，在这个属性的 desired 值变化时，得到通知。
+ *
+ * @param client 物管理客户端
+ * @param handler
+ * @return
+ */
+DmReturnCode
+device_management_shadow_register_delta(DeviceManagementClient client, const char *key, ShadowPropertyDeltaCallback cb);
 
 #ifdef __cplusplus
 }

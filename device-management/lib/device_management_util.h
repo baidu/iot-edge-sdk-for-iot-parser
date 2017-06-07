@@ -16,34 +16,23 @@
 * See the License for the specific language governing permissions and
 * limitations under the License.
 */
-#ifndef DEVICE_MANAGEMENT_CONF_H
-#define DEVICE_MANAGEMENT_CONF_H
+#ifndef DEVICE_MANAGEMENT_UTIL_H
+#define DEVICE_MANAGEMENT_UTIL_H
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-/* MQTT 发送/订阅 时指定的服务质量 */
-#define QOS 1
+/**
+ * @brief Dump current log4c configuration to ./log4c_conf.txt in case you can't find log output anywhere.
+ */
+void dump_log4c_conf();
 
-/* MQTT 保活时间。单位是秒。 */
-#define KEEP_ALIVE 60
+void exit_null_pointer();
 
-/* MQTT 连接超时时间。单位是秒。 */
-#define CONNECT_TIMEOUT 10
+void check_malloc_result(void *address);
 
-/* MQTT 订阅超时时间。单位是秒。 */
-#define SUBSCRIBE_TIMEOUT 10
-
-/* 最多能创建的客户端 */
-#define MAX_CLIENT 10
-
-/* 已发送，但还未收到服务器端 accepted/rejected 的消息，被认为是 in flight message。
- * 有超过 MAX_IN_FLIGHT_MESSAGE 之后，再尝试发送将会收到 TOO_MANY_IN_FLIGHT_MESSAGE 错误。*/
-#define MAX_IN_FLIGHT_MESSAGE 100
-
-/* 每个客户端可注册不多于此的handler */
-#define MAX_SHADOW_PROPERTY_HANDLER 100
+void safe_free(char **pointer);
 
 #ifdef __cplusplus
 }
