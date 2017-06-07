@@ -1,0 +1,11 @@
+instance dump follows (may be empty):
+factory[log4c_category_factory]:
+{ name:'root' priority:INFO additive:1 appender:'stdout' parent:'(nil)' }
+{ name:'device_management' priority:DEBUG additive:1 appender:'stdout' parent:'root' }
+factory[log4c_appender_factory]:
+{ name:'syslog' type:'syslog' layout:'basic' isopen:0 udata:(nil)}
+{ name:'stderr' type:'stream' layout:'dated' isopen:0 udata:0x7f23a91af520}
+{ name:'stdout' type:'stream' layout:'dated' isopen:1 udata:0x7f23a91af600}
+factory[log4c_layout_factory]:
+{ name:'basic' type:'basic' udata:(nil) }
+{ name:'dated' type:'dated' udata:(nil) }
