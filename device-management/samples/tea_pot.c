@@ -55,11 +55,15 @@ temperature_on_delta(const char *name, struct cJSON *desired) {
 }
 
 void on_get_ack(cJSON *document) {
-
+    char *string = cJSON_Print(document);
+    log4c_category_log(category, LOG4C_PRIORITY_INFO, "get completed. document:\n%s", string);
+    free(string);
 }
 
 void on_update_ack(cJSON *document) {
-
+    char *string = cJSON_Print(document);
+    log4c_category_log(category, LOG4C_PRIORITY_INFO, "update completed. document:\n%s", string);
+    free(string);
 }
 
 void shadow_action_callback(ShadowAction action, ShadowAckStatus status, ShadowActionAck *ack, void *context) {
@@ -71,12 +75,10 @@ void shadow_action_callback(ShadowAction action, ShadowAckStatus status, ShadowA
             on_update_ack(ack->accepted.document);
         }
         char *document = cJSON_Print(ack->accepted.document);
-//        log4c_category_log(category, LOG4C_PRIORITY_INFO, "ACCEPTED.");
         free(document);
     } else if (status == SHADOW_ACK_REJECTED) {
         log4c_category_log(category, LOG4C_PRIORITY_ERROR, "REJECTED: code=%s, message=%s.", ack->rejected.code, ack->rejected.message);
     } else if (status == SHADOW_ACK_TIMEOUT) {
-//        log4c_category_log(category, LOG4C_PRIORITY_ERROR, "TIMEOUT.");
     }
 }
 
@@ -130,7 +132,7 @@ int main() {
         shouldUpdate = alwaysUpdate || temp->valueint != actualTemperature;
         if (shouldUpdate) {
             cJSON_SetIntValue(temp, actualTemperature);
-            rc = device_management_shadow_update(client, reported, shadow_action_callback, &context, 10);
+            rc = device_management_shadow_update(client, shadow_action_callback, &context, 10, reported);
             check_return_code(rc);
         }
     }

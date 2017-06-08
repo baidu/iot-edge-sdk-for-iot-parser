@@ -89,11 +89,15 @@ typedef struct {
     void (*destroyer)(void *error);
 } UserDefinedError;
 
-typedef void (*ShadowActionCallback)(ShadowAction action, ShadowAckStatus status,
-                                     ShadowActionAck *ack, void *context);
+/**
+ * @brief 影子 GET/UPDATE/DELETE 收到 ACK 或者超时后的回调
+ */
+typedef void (*ShadowActionCallback)(ShadowAction action, ShadowAckStatus status, ShadowActionAck *ack, void *context);
 
 /**
- * @param name 发生改变属性的名称
+ * @brief 影子发生变化时的回调
+ *
+ * @param name 发生改变属性的名称。如果为 NULL 则表示根。
  * @param desired 发生改变属性的期待值
  * @return 返回一个错误，表示无法按期待值改变属性。否则返回 NULL。
  */
@@ -111,11 +115,12 @@ device_management_fini();
 
 /**
  * @brief 创建一个物管理客户端
- * @param client
- * @param broker
- * @param deviceName
- * @param username
- * @param password
+ *
+ * @param client 返回所创建的客户端
+ * @param broker 服务器地址，形式如 "tcp://server:1883"
+ * @param deviceName 设备名字
+ * @param username MQTT 用户名
+ * @param password MQTT 密码
  * @return
  */
 DmReturnCode
@@ -124,30 +129,44 @@ device_management_create(DeviceManagementClient *client, const char *broker, con
 
 /**
  * @brief 连接客户端至服务器
- * @param client
+ *
+ * @param client 物管理客户端
  * @return
  */
 DmReturnCode
 device_management_connect(DeviceManagementClient client);
 
+/**
+ * @brief 断开并销毁客户端
+ *
+ * @param client 物管理客户端
+ * @return
+ */
 DmReturnCode
 device_management_destroy(DeviceManagementClient client);
 
 /**
  * @brief 更新设备影子
- * @param client
- * @param reported
- * @return
+ *
+ * @param client 物管理客户端
+ * @param callback 完成之后的回调
+ * @param context 传递给回调的上下文
+ * @param timeout 为这个请求指定一个超时时间。单位为秒。
+ * @param reported 要上报的内容
+ * @return 代码
  */
 DmReturnCode
-device_management_shadow_update(DeviceManagementClient client, cJSON *reported, ShadowActionCallback callback,
-                                void *context, uint8_t timeout);
+device_management_shadow_update(DeviceManagementClient client, ShadowActionCallback callback, void *context,
+                                uint8_t timeout, cJSON *reported);
 
 /**
  * @brief 获取设备影子
- * @param client
- * @param data
- * @return
+ *
+ * @param client 物管理客户端
+ * @param callback 完成之后的回调
+ * @param context 传递给回调的上下文
+ * @param timeout 为这个请求指定一个超时时间。单位为秒。
+ * @return 代码
  */
 DmReturnCode
 device_management_shadow_get(DeviceManagementClient client, ShadowActionCallback callback, void *context,
@@ -155,9 +174,12 @@ device_management_shadow_get(DeviceManagementClient client, ShadowActionCallback
 
 /**
  * @brief 删除设备影子
- * @param client
- * @param data
- * @return
+ *
+ * @param client 物管理客户端
+ * @param callback 完成之后的回调
+ * @param context 传递给回调的上下文
+ * @param timeout 为这个请求指定一个超时时间。单位为秒。
+ * @return 代码
  */
 DmReturnCode
 device_management_shadow_delete(DeviceManagementClient client, ShadowActionCallback callback, void *context,
@@ -167,8 +189,10 @@ device_management_shadow_delete(DeviceManagementClient client, ShadowActionCallb
  * @brief 为某一个属性注册一个回调，在这个属性的 desired 值变化时，得到通知。
  *
  * @param client 物管理客户端
- * @param handler
- * @return
+ * @param callback 完成之后的回调
+ * @param context 传递给回调的上下文
+ * @param timeout 为这个请求指定一个超时时间。单位为秒。
+ * @return 代码
  */
 DmReturnCode
 device_management_shadow_register_delta(DeviceManagementClient client, const char *key, ShadowPropertyDeltaCallback cb);

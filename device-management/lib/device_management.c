@@ -16,6 +16,12 @@
 * See the License for the specific language governing permissions and
 * limitations under the License.
 */
+
+/**
+ * @brief
+ *
+ * @authors Zhao Bo zhaobo03@baidu.com
+ */
 #include "device_management.h"
 #include "device_management_conf.h"
 #include "device_management_util.h"
@@ -312,8 +318,8 @@ device_management_connect(DeviceManagementClient client) {
 }
 
 DmReturnCode
-device_management_shadow_update(DeviceManagementClient client, cJSON *reported, ShadowActionCallback callback,
-                                void *context, uint8_t timeout) {
+device_management_shadow_update(DeviceManagementClient client, ShadowActionCallback callback, void *context,
+                                uint8_t timeout, cJSON *reported) {
     DmReturnCode rc;
 
     cJSON *payload = cJSON_CreateObject();
@@ -818,54 +824,61 @@ mqtt_on_delivery_complete(void *context, MQTTAsync_token dt) {
 int
 mqtt_on_message_arrived(void *context, char *topicName, int topicLen, MQTTAsync_message *message) {
     device_management_client_t *c = context;
-    char *json = message->payload;
+    char *jsonString = message->payload;
     if (message->payloadlen < 3) {
         return -1;
     }
-    if (json[message->payloadlen - 1] != '\0') {
+    if (jsonString[message->payloadlen - 1] != '\0') {
         // Make a copy
-        json = malloc(message->payloadlen + 1);
-        strncpy(json, message->payload, message->payloadlen);
-        json[message->payloadlen] = '\0';
+        jsonString = malloc(message->payloadlen + 1);
+        strncpy(jsonString, message->payload, message->payloadlen);
+        jsonString[message->payloadlen] = '\0';
     }
     log4c_category_log(category, LOG4C_PRIORITY_TRACE, "\n[<<<<<<\ntopic:\n%s\npayload:\n%s\n <<<<<<]",
-                       topicName, json);
-    cJSON *payload = cJSON_Parse(json);
-    if (json != message->payload) {
-        free(json);
+                       topicName, jsonString);
+    cJSON *payload = cJSON_Parse(jsonString);
+    if (jsonString != message->payload) {
+        free(jsonString);
     }
-    ShadowAckStatus status = SHADOW_ACK_ACCEPTED;
-    ShadowAction action = SHADOW_INVALID;
 
-    if (strncasecmp(c->topicContract->delta, topicName, strlen(c->topicContract->delta)) == 0) {
-        device_management_delta_arrived(c, payload);
+    if (payload == NULL) {
+        /* json parsing failed. */
+        log4c_category_log(category, LOG4C_PRIORITY_WARN, "failed to parse mqtt message as json. string is:\n%s",
+                           jsonString);
     } else {
-        if (strncasecmp(c->topicContract->updateAccepted, topicName, strlen(c->topicContract->updateAccepted)) ==
-            0) {
-            action = SHADOW_UPDATE;
-        } else if (strncasecmp(c->topicContract->updateRejected, topicName,
-                               strlen(c->topicContract->updateRejected)) == 0) {
-            action = SHADOW_UPDATE;
-            status = SHADOW_ACK_REJECTED;
-        } else if (strncasecmp(c->topicContract->getAccepted, topicName, strlen(c->topicContract->getAccepted)) ==
-                   0) {
-            action = SHADOW_GET;
-        } else if (strncasecmp(c->topicContract->getRejected, topicName, strlen(c->topicContract->getRejected)) ==
-                   0) {
-            action = SHADOW_GET;
-            status = SHADOW_ACK_REJECTED;
+        ShadowAction action = SHADOW_INVALID;
+        ShadowAckStatus status = SHADOW_ACK_ACCEPTED;
+
+        if (strncasecmp(c->topicContract->delta, topicName, strlen(c->topicContract->delta)) == 0) {
+            device_management_delta_arrived(c, payload);
         } else {
-            log4c_category_log(category, LOG4C_PRIORITY_ERROR, "Unexpected topic %s.", topicName);
-        }
-
-        if (action != SHADOW_INVALID) {
-            cJSON *requestId = cJSON_GetObjectItem(payload, REQUEST_ID_KEY);
-
-            if (requestId == NULL) {
-                log4c_category_log(category, LOG4C_PRIORITY_ERROR, "cannot find request id.");
+            if (strncasecmp(c->topicContract->updateAccepted, topicName, strlen(c->topicContract->updateAccepted)) ==
+                0) {
+                action = SHADOW_UPDATE;
+            } else if (strncasecmp(c->topicContract->updateRejected, topicName,
+                                   strlen(c->topicContract->updateRejected)) == 0) {
+                action = SHADOW_UPDATE;
+                status = SHADOW_ACK_REJECTED;
+            } else if (strncasecmp(c->topicContract->getAccepted, topicName, strlen(c->topicContract->getAccepted)) ==
+                       0) {
+                action = SHADOW_GET;
+            } else if (strncasecmp(c->topicContract->getRejected, topicName, strlen(c->topicContract->getRejected)) ==
+                       0) {
+                action = SHADOW_GET;
+                status = SHADOW_ACK_REJECTED;
             } else {
+                log4c_category_log(category, LOG4C_PRIORITY_ERROR, "Unexpected topic %s.", topicName);
+            }
 
-                device_management_shadow_handle_response(c, requestId->valuestring, action, status, payload);
+            if (action != SHADOW_INVALID) {
+                cJSON *requestId = cJSON_GetObjectItem(payload, REQUEST_ID_KEY);
+
+                if (requestId == NULL) {
+                    log4c_category_log(category, LOG4C_PRIORITY_ERROR, "cannot find request id.");
+                } else {
+
+                    device_management_shadow_handle_response(c, requestId->valuestring, action, status, payload);
+                }
             }
         }
     }

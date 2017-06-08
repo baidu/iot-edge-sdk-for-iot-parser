@@ -16,6 +16,7 @@ find_package(Paho REQUIRED)
 include_directories(${PAHO_INCLUDE_DIRS})
 set(LIBS ${LIBS} ${PAHO_LIBRARIES})
 
+find_package(Threads)
 
 find_library(OPENSSL_LIB NAMES ssl libssl ssleay32
         HINTS ${OPENSSL_SEARCH_PATH}/lib ${OPENSSL_SEARCH_PATH}/lib64)
@@ -25,7 +26,7 @@ add_library(${DM_LIBRARY_NAME} SHARED
         device_management_util.c device_management_util.h
         device_management_conf.h)
 
-target_link_libraries(${DM_LIBRARY_NAME} ${LIBUUID_LIBRARIES} ${LOG4C_LIBRARIES} ${CJSON_LIBRARIES} ${PAHO_LIBRARIES})
+target_link_libraries(${DM_LIBRARY_NAME} ${LIBUUID_LIBRARIES} ${LOG4C_LIBRARIES} ${CJSON_LIBRARIES} ${PAHO_LIBRARIES} ${CMAKE_THREAD_LIBS_INIT})
 
 set_property(TARGET ${DM_LIBRARY_NAME} PROPERTY C_STANDARD 90)
 
