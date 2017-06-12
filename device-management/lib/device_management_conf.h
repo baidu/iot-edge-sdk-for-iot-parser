@@ -16,6 +16,12 @@
 * See the License for the specific language governing permissions and
 * limitations under the License.
 */
+
+/**
+ * @brief compiling time configuration of device management SDK.
+ *
+ * @authors Zhao Bo zhaobo03@baidu.com
+ */
 #ifndef DEVICE_MANAGEMENT_CONF_H
 #define DEVICE_MANAGEMENT_CONF_H
 
