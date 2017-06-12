@@ -16,17 +16,19 @@
 * See the License for the specific language governing permissions and
 * limitations under the License.
 */
+
+/**
+ * @brief 一个模拟智能茶壶的例子。在这个例子中将用到update shadow，以及按照shadow delta的设定，来控制茶壶的温度。
+ * 茶壶的温度可以每秒钟升高/降低1度。
+ *
+ * @authors Zhao Bo zhaobo03@baidu.com
+ */
 #include <stdlib.h>
 #include <device_management.h>
 #include <stdio.h>
 #include <zconf.h>
 #include <log4c.h>
 
-/**
- * @brief 一个模拟智能茶壶的例子。在这个例子中将用到update shadow，以及按照shadow delta的设定，来控制茶壶的温度。
- * 茶壶的温度可以每秒钟升高/降低1度。
- *
- */
 typedef struct {
     int value;
 } MyContext;

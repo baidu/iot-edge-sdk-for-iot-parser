@@ -16,6 +16,12 @@
 * See the License for the specific language governing permissions and
 * limitations under the License.
 */
+
+/**
+ * @brief internal helper functions.
+ *
+ * @authors Zhao Bo zhaobo03@baidu.com
+ */
 #ifndef DEVICE_MANAGEMENT_UTIL_H
 #define DEVICE_MANAGEMENT_UTIL_H
 

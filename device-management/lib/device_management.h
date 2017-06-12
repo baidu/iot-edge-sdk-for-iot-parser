@@ -16,6 +16,12 @@
 * See the License for the specific language governing permissions and
 * limitations under the License.
 */
+
+/**
+ * @brief interface of device management SDK.
+ *
+ * @authors Zhao Bo zhaobo03@baidu.com
+ */
 #ifndef DEVICE_MANAGEMENT_H
 #define DEVICE_MANAGEMENT_H
 
@@ -107,11 +113,9 @@ struct device_management_client_t;
 
 typedef struct device_management_client_t *DeviceManagementClient;
 
-DmReturnCode
-device_management_init();
+DmReturnCode device_management_init();
 
-DmReturnCode
-device_management_fini();
+DmReturnCode device_management_fini();
 
 /**
  * @brief 创建一个物管理客户端
@@ -123,8 +127,7 @@ device_management_fini();
  * @param password MQTT 密码
  * @return
  */
-DmReturnCode
-device_management_create(DeviceManagementClient *client, const char *broker, const char *deviceName,
+DmReturnCode device_management_create(DeviceManagementClient *client, const char *broker, const char *deviceName,
                          const char *username, const char *password);
 
 /**
@@ -133,8 +136,7 @@ device_management_create(DeviceManagementClient *client, const char *broker, con
  * @param client 物管理客户端
  * @return
  */
-DmReturnCode
-device_management_connect(DeviceManagementClient client);
+DmReturnCode device_management_connect(DeviceManagementClient client);
 
 /**
  * @brief 断开并销毁客户端
@@ -142,8 +144,7 @@ device_management_connect(DeviceManagementClient client);
  * @param client 物管理客户端
  * @return
  */
-DmReturnCode
-device_management_destroy(DeviceManagementClient client);
+DmReturnCode device_management_destroy(DeviceManagementClient client);
 
 /**
  * @brief 更新设备影子
@@ -155,8 +156,7 @@ device_management_destroy(DeviceManagementClient client);
  * @param reported 要上报的内容
  * @return 代码
  */
-DmReturnCode
-device_management_shadow_update(DeviceManagementClient client, ShadowActionCallback callback, void *context,
+DmReturnCode device_management_shadow_update(DeviceManagementClient client, ShadowActionCallback callback, void *context,
                                 uint8_t timeout, cJSON *reported);
 
 /**
@@ -168,8 +168,7 @@ device_management_shadow_update(DeviceManagementClient client, ShadowActionCallb
  * @param timeout 为这个请求指定一个超时时间。单位为秒。
  * @return 代码
  */
-DmReturnCode
-device_management_shadow_get(DeviceManagementClient client, ShadowActionCallback callback, void *context,
+DmReturnCode device_management_shadow_get(DeviceManagementClient client, ShadowActionCallback callback, void *context,
                              uint8_t timeout);
 
 /**
@@ -181,8 +180,7 @@ device_management_shadow_get(DeviceManagementClient client, ShadowActionCallback
  * @param timeout 为这个请求指定一个超时时间。单位为秒。
  * @return 代码
  */
-DmReturnCode
-device_management_shadow_delete(DeviceManagementClient client, ShadowActionCallback callback, void *context,
+DmReturnCode device_management_shadow_delete(DeviceManagementClient client, ShadowActionCallback callback, void *context,
                              uint8_t timeout);
 
 /**
@@ -194,8 +192,7 @@ device_management_shadow_delete(DeviceManagementClient client, ShadowActionCallb
  * @param timeout 为这个请求指定一个超时时间。单位为秒。
  * @return 代码
  */
-DmReturnCode
-device_management_shadow_register_delta(DeviceManagementClient client, const char *key, ShadowPropertyDeltaCallback cb);
+DmReturnCode device_management_shadow_register_delta(DeviceManagementClient client, const char *key, ShadowPropertyDeltaCallback cb);
 
 #ifdef __cplusplus
 }

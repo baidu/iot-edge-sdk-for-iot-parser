@@ -18,7 +18,7 @@
 */
 
 /**
- * @brief
+ * @brief implementation of device management SDK.
  *
  * @authors Zhao Bo zhaobo03@baidu.com
  */
@@ -125,76 +125,60 @@ static ClientGroup allClients;
 
 static pthread_t inFlightMessageKeeper;
 
-static TopicContract *
-topic_contract_create(const char *deviceName);
+static TopicContract * topic_contract_create(const char *deviceName);
 
-static void
-topic_contract_destroy(TopicContract *topics);
+static void topic_contract_destroy(TopicContract *topics);
 
-static bool
-client_group_add(ClientGroup *group, device_management_client_t *client);
+static bool client_group_add(ClientGroup *group, device_management_client_t *client);
 
-static bool
-client_group_remove(ClientGroup *group, device_management_client_t *client);
+static bool client_group_remove(ClientGroup *group, device_management_client_t *client);
 
-static void
-in_flight_message_house_keep(device_management_client_t *c);
+static void client_group_iterate(ClientGroup *clients, void (*fp)(device_management_client_t *c));
 
-static void *
-in_flight_message_house_keep_proc(void *ignore);
+static void in_flight_message_house_keep(device_management_client_t *c);
 
-static const char *
-message_get_request_id(const cJSON *payload);
+static void * in_flight_message_house_keep_proc(void *ignore);
 
-static bool
-device_management_is_connected(DeviceManagementClient client);
+static const char * message_get_request_id(const cJSON *payload);
 
-static bool
-device_management_is_connected2(device_management_client_t *c);
+static bool device_management_is_connected(DeviceManagementClient client);
 
-static DmReturnCode
-device_management_shadow_send_json(device_management_client_t *c, const char *topic,
+static bool device_management_is_connected2(device_management_client_t *c);
+
+static DmReturnCode device_management_shadow_send_json(device_management_client_t *c, const char *topic,
                                    const char *requestId, cJSON *payload);
 
-static DmReturnCode
-device_management_shadow_send(DeviceManagementClient client, ShadowAction action, cJSON *payload,
+static DmReturnCode device_management_shadow_send(DeviceManagementClient client, ShadowAction action, cJSON *payload,
                               ShadowActionCallback callback,
                               void *context, uint8_t timeout);
 
-static int
-device_management_shadow_handle_response(device_management_client_t *c, const char *requestId, ShadowAction action,
+static int device_management_shadow_handle_response(device_management_client_t *c, const char *requestId, ShadowAction action,
                                          ShadowAckStatus status,
                                          cJSON *payload);
 
-static DmReturnCode
-device_management_delta_arrived(device_management_client_t *c, cJSON *payload);
+static DmReturnCode device_management_delta_arrived(device_management_client_t *c, cJSON *payload);
 
-static void
-mqtt_on_connected(void *context, char *cause);
+static void mqtt_on_connected(void *context, char *cause);
 
-static void
-mqtt_on_connection_lost(void *context, char *cause);
+static void mqtt_on_connection_lost(void *context, char *cause);
 
-static void
-mqtt_on_connect_success(void *context, MQTTAsync_successData *response);
+static void mqtt_on_connect_success(void *context, MQTTAsync_successData *response);
 
-static void
-mqtt_on_connect_failure(void *context, MQTTAsync_failureData *response);
+static void mqtt_on_connect_failure(void *context, MQTTAsync_failureData *response);
 
-static void
-mqtt_on_publish_success(void *context, MQTTAsync_successData *response);
+static void mqtt_on_publish_success(void *context, MQTTAsync_successData *response);
 
-static void
-mqtt_on_publish_failure(void *context, MQTTAsync_failureData *response);
+static void mqtt_on_publish_failure(void *context, MQTTAsync_failureData *response);
 
-static int
-mqtt_on_message_arrived(void *context, char *topicName, int topicLen, MQTTAsync_message *message);
+static int mqtt_on_message_arrived(void *context, char *topicName, int topicLen, MQTTAsync_message *message);
 
-static void
-mqtt_on_delivery_complete(void *context, MQTTAsync_token token);
+static void mqtt_on_delivery_complete(void *context, MQTTAsync_token token);
 
-DmReturnCode
-device_management_init() {
+/**
+ * @brief Global initialization of device management client SDK. Not thread safe.
+ *
+ */
+DmReturnCode device_management_init() {
     if (hasInit) {
         log4c_category_log(category, LOG4C_PRIORITY_WARN, "already initialized.");
         return SUCCESS;
@@ -209,16 +193,13 @@ device_management_init() {
 
     log4c_category_log(category, LOG4C_PRIORITY_INFO, "initialized.");
 
-//    dump_log4c_conf();
-
     pthread_mutex_init(&(allClients.mutex), NULL);
     pthread_create(&inFlightMessageKeeper, NULL, in_flight_message_house_keep_proc, NULL);
 
     return SUCCESS;
 }
 
-DmReturnCode
-device_management_fini() {
+DmReturnCode device_management_fini() {
     if (!hasInit) {
         printf("not initialized. no clean up needed.");
         return SUCCESS;
@@ -237,15 +218,19 @@ device_management_fini() {
     return SUCCESS;
 }
 
-DmReturnCode
-device_management_create(DeviceManagementClient *client, const char *broker, const char *deviceName,
+DmReturnCode device_management_create(DeviceManagementClient *client, const char *broker, const char *deviceName,
                          const char *username, const char *password) {
     int rc;
     int i;
 
-    device_management_client_t *c = malloc(sizeof(device_management_client_t));
+    if (client == NULL || broker == NULL || deviceName == NULL || username == NULL || password == NULL) {
+        return NULL_POINTER;
+    }
 
-    // TODO: validate arguments.
+    device_management_client_t *c = malloc(sizeof(device_management_client_t));
+    check_malloc_result(c);
+
+    /* Create MQTT client. */
     rc = MQTTAsync_create(&(c->mqttClient), broker, deviceName, MQTTCLIENT_PERSISTENCE_NONE, NULL);
 
     if (rc == EXIT_FAILURE) {
@@ -258,14 +243,12 @@ device_management_create(DeviceManagementClient *client, const char *broker, con
                            mqtt_on_delivery_complete);
     MQTTAsync_setConnected(c->mqttClient, c, mqtt_on_connected);
 
+    /* Set up device_management_client_t. */
     c->errorMessage = NULL;
     c->username = strdup(username);
     c->password = strdup(password);
     c->deviceName = strdup(deviceName);
-    // TODO: check rc for below statements.
     c->topicContract = topic_contract_create(deviceName);
-    // TODO: set magic to c
-    // TODO: set context.
     c->properties.index = 0;
     pthread_mutex_init(&(c->properties.mutex), NULL);
     for (i = 0; i < MAX_IN_FLIGHT_MESSAGE; ++i) {
@@ -273,18 +256,18 @@ device_management_create(DeviceManagementClient *client, const char *broker, con
     }
     pthread_mutex_init(&(c->messages.mutex), NULL);
     pthread_mutex_init(&(c->mutex), NULL);
-    *client = c;
     client_group_add(&allClients, c);
+    *client = c;
 
     log4c_category_log(category, LOG4C_PRIORITY_INFO, "created. broker=%s, deviceName=%s.",
                        broker, deviceName);
     return SUCCESS;
 }
 
-DmReturnCode
-device_management_connect(DeviceManagementClient client) {
+DmReturnCode device_management_connect(DeviceManagementClient client) {
     int rc;
     device_management_client_t *c = client;
+
     MQTTAsync_connectOptions connectOptions = MQTTAsync_connectOptions_initializer;
     connectOptions.keepAliveInterval = KEEP_ALIVE;
     connectOptions.cleansession = 1;
@@ -317,8 +300,7 @@ device_management_connect(DeviceManagementClient client) {
     }
 }
 
-DmReturnCode
-device_management_shadow_update(DeviceManagementClient client, ShadowActionCallback callback, void *context,
+DmReturnCode device_management_shadow_update(DeviceManagementClient client, ShadowActionCallback callback, void *context,
                                 uint8_t timeout, cJSON *reported) {
     DmReturnCode rc;
 
@@ -337,8 +319,7 @@ device_management_shadow_update(DeviceManagementClient client, ShadowActionCallb
     return rc;
 }
 
-DmReturnCode
-device_management_shadow_get(DeviceManagementClient client, ShadowActionCallback callback, void *context,
+DmReturnCode device_management_shadow_get(DeviceManagementClient client, ShadowActionCallback callback, void *context,
                              uint8_t timeout) {
     DmReturnCode rc;
     cJSON *payload = cJSON_CreateObject();
@@ -353,8 +334,7 @@ device_management_shadow_get(DeviceManagementClient client, ShadowActionCallback
     return rc;
 }
 
-DmReturnCode
-device_management_shadow_delete(DeviceManagementClient client, ShadowActionCallback callback, void *context,
+DmReturnCode device_management_shadow_delete(DeviceManagementClient client, ShadowActionCallback callback, void *context,
                              uint8_t timeout) {
     DmReturnCode rc;
     cJSON *payload = cJSON_CreateObject();
@@ -369,8 +349,7 @@ device_management_shadow_delete(DeviceManagementClient client, ShadowActionCallb
     return rc;
 }
 
-DmReturnCode
-device_management_shadow_register_delta(DeviceManagementClient client, const char *key, ShadowPropertyDeltaCallback cb) {
+DmReturnCode device_management_shadow_register_delta(DeviceManagementClient client, const char *key, ShadowPropertyDeltaCallback cb) {
     DmReturnCode rc = SUCCESS;
 
     if (client == NULL || cb == NULL) {
@@ -419,8 +398,7 @@ DmReturnCode device_management_destroy(DeviceManagementClient client) {
     return SUCCESS;
 }
 
-TopicContract *
-topic_contract_create(const char *deviceName) {
+TopicContract * topic_contract_create(const char *deviceName) {
     int rc;
     TopicContract *t = malloc(sizeof(TopicContract));
     check_malloc_result(t);
@@ -448,8 +426,7 @@ topic_contract_create(const char *deviceName) {
     t->subTopics[6] = t->delta;
 }
 
-void
-topic_contract_destroy(TopicContract *topics) {
+void topic_contract_destroy(TopicContract *topics) {
     if (topics != NULL) {
         safe_free(&(topics->update));
         safe_free(&(topics->updateAccepted));
@@ -463,8 +440,7 @@ topic_contract_destroy(TopicContract *topics) {
     }
 }
 
-static void
-client_group_iterate(ClientGroup *clients, void (*fp)(device_management_client_t *c)) {
+void client_group_iterate(ClientGroup *clients, void (*fp)(device_management_client_t *c)) {
     int i;
     pthread_mutex_lock(&(clients->mutex));
     for (i = 0; i < MAX_CLIENT; ++i) {
@@ -475,8 +451,7 @@ client_group_iterate(ClientGroup *clients, void (*fp)(device_management_client_t
     pthread_mutex_unlock(&(clients->mutex));
 }
 
-bool
-client_group_add(ClientGroup *group, device_management_client_t *client) {
+bool client_group_add(ClientGroup *group, device_management_client_t *client) {
     int i;
     bool rc = false;
 
@@ -493,8 +468,7 @@ client_group_add(ClientGroup *group, device_management_client_t *client) {
     return rc;
 }
 
-bool
-client_group_remove(ClientGroup *group, device_management_client_t *client) {
+bool client_group_remove(ClientGroup *group, device_management_client_t *client) {
     int i;
     bool rc = false;
 
@@ -512,8 +486,7 @@ client_group_remove(ClientGroup *group, device_management_client_t *client) {
 }
 
 
-void
-in_flight_message_house_keep(device_management_client_t *c) {
+void in_flight_message_house_keep(device_management_client_t *c) {
     int i;
     time_t now;
     time(&now);
@@ -537,28 +510,24 @@ in_flight_message_house_keep(device_management_client_t *c) {
 
 }
 
-void *
-in_flight_message_house_keep_proc(void *ignore) {
+void * in_flight_message_house_keep_proc(void *ignore) {
     while (1) {
         client_group_iterate(&allClients, in_flight_message_house_keep);
         sleep(1);
     }
 }
 
-const char *
-message_get_request_id(const cJSON *payload) {
+const char * message_get_request_id(const cJSON *payload) {
     cJSON *requestId = cJSON_GetObjectItemCaseSensitive(payload, "requestId");
     return requestId->valuestring;
 }
 
-void
-exit_null_pointer() {
+void exit_null_pointer() {
     log4c_category_log(category, LOG4C_PRIORITY_ERROR, "NULL POINTER");
     exit(NULL_POINTER);
 }
 
-DmReturnCode
-in_flight_message_add(InFlightMessageList *table, const char *requestId, ShadowAction action,
+DmReturnCode in_flight_message_add(InFlightMessageList *table, const char *requestId, ShadowAction action,
                       ShadowActionCallback callback,
                       void *context, uint8_t timeout) {
     int rc = TOO_MANY_IN_FLIGHT_MESSAGE;
@@ -583,8 +552,7 @@ in_flight_message_add(InFlightMessageList *table, const char *requestId, ShadowA
     return rc;
 }
 
-bool
-device_management_is_connected(DeviceManagementClient client) {
+bool device_management_is_connected(DeviceManagementClient client) {
     if (client == NULL) {
         exit_null_pointer();
         return false;
@@ -595,8 +563,7 @@ device_management_is_connected(DeviceManagementClient client) {
     return device_management_is_connected2(c);
 }
 
-bool
-device_management_is_connected2(device_management_client_t *c) {
+bool device_management_is_connected2(device_management_client_t *c) {
     if (c->mqttClient == NULL) {
         return false;
     }
@@ -604,8 +571,7 @@ device_management_is_connected2(device_management_client_t *c) {
     return MQTTAsync_isConnected(c->mqttClient) && c->hasSubscribed ? true : false;
 }
 
-DmReturnCode
-device_management_shadow_send_json(device_management_client_t *c, const char *topic,
+DmReturnCode device_management_shadow_send_json(device_management_client_t *c, const char *topic,
                                    const char *requestId, cJSON *payload) {
     DmReturnCode dmrc = SUCCESS;
     MQTTAsync_message message = MQTTAsync_message_initializer;
@@ -641,8 +607,7 @@ device_management_shadow_send_json(device_management_client_t *c, const char *to
     return dmrc;
 }
 
-DmReturnCode
-device_management_shadow_send(DeviceManagementClient client, ShadowAction action, cJSON *payload,
+DmReturnCode device_management_shadow_send(DeviceManagementClient client, ShadowAction action, cJSON *payload,
                               ShadowActionCallback callback,
                               void *context, uint8_t timeout) {
     const char *topic;
@@ -676,8 +641,7 @@ device_management_shadow_send(DeviceManagementClient client, ShadowAction action
     return SUCCESS;
 }
 
-int
-device_management_shadow_handle_response(device_management_client_t *c, const char *requestId, ShadowAction action,
+int device_management_shadow_handle_response(device_management_client_t *c, const char *requestId, ShadowAction action,
                                          ShadowAckStatus status,
                                          cJSON *payload) {
     int rc = NO_MATCHING_IN_FLIGHT_MESSAGE;
@@ -708,8 +672,7 @@ device_management_shadow_handle_response(device_management_client_t *c, const ch
     return rc;
 }
 
-DmReturnCode
-device_management_delta_arrived(device_management_client_t *c, cJSON *payload) {
+DmReturnCode device_management_delta_arrived(device_management_client_t *c, cJSON *payload) {
     uint32_t i = 0;
     UserDefinedError *error = NULL;
     cJSON *desired;
@@ -751,8 +714,7 @@ device_management_delta_arrived(device_management_client_t *c, cJSON *payload) {
     return SUCCESS;
 }
 
-void
-mqtt_on_connected(void *context, char *cause) {
+void mqtt_on_connected(void *context, char *cause) {
     int i;
     int rc;
     MQTTAsync_responseOptions responseOptions;
@@ -803,26 +765,22 @@ void mqtt_on_connect_failure(void *context, MQTTAsync_failureData *response) {
     c->errorMessage = strdup(response->message);
 }
 
-void
-mqtt_on_publish_success(void *context, MQTTAsync_successData *response) {
+void mqtt_on_publish_success(void *context, MQTTAsync_successData *response) {
     free(context);
 }
 
-void
-mqtt_on_publish_failure(void *context, MQTTAsync_failureData *response) {
+void mqtt_on_publish_failure(void *context, MQTTAsync_failureData *response) {
     log4c_category_log(category, LOG4C_PRIORITY_ERROR, "failed to send json. code=%d, message=%s.",
                        response->code, response->message);
     free(context);
 }
 
-void
-mqtt_on_delivery_complete(void *context, MQTTAsync_token dt) {
+void mqtt_on_delivery_complete(void *context, MQTTAsync_token dt) {
     // TODO: anything to do?
     device_management_client_t *c = context;
 }
 
-int
-mqtt_on_message_arrived(void *context, char *topicName, int topicLen, MQTTAsync_message *message) {
+int mqtt_on_message_arrived(void *context, char *topicName, int topicLen, MQTTAsync_message *message) {
     device_management_client_t *c = context;
     char *jsonString = message->payload;
     if (message->payloadlen < 3) {
