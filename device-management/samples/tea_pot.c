@@ -101,7 +101,7 @@ int main() {
     const char *broker = "tcp://localhost";
     const char *username = "test/test";
     const char *password = "test";
-    const char *device_id = "tea_pot_1";
+    const char *deviceName = "tea_pot_1";
     MyContext context;
     bool shouldUpdate;
 
@@ -110,7 +110,7 @@ int main() {
     category = log4c_category_new("tea-pot");
 
     DeviceManagementClient client;
-    rc = device_management_create(&client, broker, device_id, username, password);
+    rc = device_management_create(&client, broker, deviceName, username, password);
     check_return_code(rc);
     rc = device_management_connect(client);
     check_return_code(rc);

@@ -196,6 +196,7 @@ DmReturnCode device_management_init() {
     pthread_mutex_init(&(allClients.mutex), NULL);
     pthread_create(&inFlightMessageKeeper, NULL, in_flight_message_house_keep_proc, NULL);
 
+    hasInit = true;
     return SUCCESS;
 }
 
@@ -292,6 +293,7 @@ DmReturnCode device_management_connect(DeviceManagementClient client) {
 
     if (MQTTAsync_isConnected(c->mqttClient)) {
         log4c_category_log(category, LOG4C_PRIORITY_INFO, "MQTT connected.");
+        // TODO: wait sub complete.
         return SUCCESS;
     } else if (c->errorMessage != NULL) {
         log4c_category_log(category, LOG4C_PRIORITY_ERROR, "MQTT connect failed. code=%d, message=%s.", c->errorCode,

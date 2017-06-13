@@ -21,7 +21,7 @@ else (PAHO_LIBRARIES AND PAHO_INCLUDE_DIRS)
 
     find_path(PAHO_INCLUDE_DIR
             NAMES
-            MQTTAsync.h
+            MQTTAsync.h MQTTClient.h
             PATHS
             /usr/include
             /usr/local/include
@@ -32,7 +32,7 @@ else (PAHO_LIBRARIES AND PAHO_INCLUDE_DIRS)
 
     find_library(PAHO_LIBRARY
             NAMES
-            paho-mqtt3a
+            paho-mqtt3c
             PATHS
             /usr/lib
             /usr/local/lib
@@ -40,6 +40,17 @@ else (PAHO_LIBRARIES AND PAHO_INCLUDE_DIRS)
             /sw/lib
             )
     mark_as_advanced(PAHO_LIBRARY)
+
+    find_library(PAHOA_LIBRARY
+            NAMES
+            paho-mqtt3a
+            PATHS
+            /usr/lib
+            /usr/local/lib
+            /opt/local/lib
+            /sw/lib
+            )
+    mark_as_advanced(PAHOA_LIBRARY)
 
     if (PAHO_LIBRARY)
         set(PAHO_FOUND TRUE CACHE INTERNAL "Wether the PAHO library has been found" FORCE)
@@ -53,6 +64,7 @@ else (PAHO_LIBRARIES AND PAHO_INCLUDE_DIRS)
         set(PAHO_LIBRARIES
                 ${PAHO_LIBRARIES}
                 ${PAHO_LIBRARY}
+                ${PAHOA_LIBRARY}
                 )
     endif (PAHO_FOUND)
 
