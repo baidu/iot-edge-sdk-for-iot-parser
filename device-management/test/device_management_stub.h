@@ -9,21 +9,18 @@
 #include <memory>
 #include <bits/shared_ptr.h>
 
-class ShadowEventListener {
-public:
-    virtual void onAction() = 0;
-};
+class DeviceManagementStubImpl;
 
 class DeviceManagementStub {
-private:
-    const std::string broker;
-    const std::string username;
-    const std::string password;
-
 public:
-    void disableAutoResponse();
-    void addListener(std::shared_ptr<ShadowEventListener> listener);
-};
+    typedef std::function<void (const std::string &, const std::string &)> CallBack;
 
+    static std::shared_ptr<DeviceManagementStub> create();
+
+    virtual void start() = 0;
+    virtual void setAutoResponse(bool value) = 0;
+    virtual void addListener(CallBack f) = 0;
+    virtual void clearListeners() = 0;
+};
 
 #endif //DEVICE_MANAGEMENT_DEVICEMANAGEMENTSTUB_H
