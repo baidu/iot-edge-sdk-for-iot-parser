@@ -125,7 +125,7 @@ static ClientGroup allClients;
 
 static pthread_t inFlightMessageKeeper;
 
-static TopicContract * topic_contract_create(const char *deviceName);
+static TopicContract *topic_contract_create(const char *deviceName);
 
 static void topic_contract_destroy(TopicContract *topics);
 
@@ -137,22 +137,23 @@ static void client_group_iterate(ClientGroup *clients, void (*fp)(device_managem
 
 static void in_flight_message_house_keep(device_management_client_t *c);
 
-static void * in_flight_message_house_keep_proc(void *ignore);
+static void *in_flight_message_house_keep_proc(void *ignore);
 
-static const char * message_get_request_id(const cJSON *payload);
+static const char *message_get_request_id(const cJSON *payload);
 
 static bool device_management_is_connected(DeviceManagementClient client);
 
 static bool device_management_is_connected2(device_management_client_t *c);
 
 static DmReturnCode device_management_shadow_send_json(device_management_client_t *c, const char *topic,
-                                   const char *requestId, cJSON *payload);
+                                                       const char *requestId, cJSON *payload);
 
 static DmReturnCode device_management_shadow_send(DeviceManagementClient client, ShadowAction action, cJSON *payload,
-                              ShadowActionCallback callback,
-                              void *context, uint8_t timeout);
+                                                  ShadowActionCallback callback,
+                                                  void *context, uint8_t timeout);
 
-static int device_management_shadow_handle_response(device_management_client_t *c, const char *requestId, ShadowAction action,
+static int
+device_management_shadow_handle_response(device_management_client_t *c, const char *requestId, ShadowAction action,
                                          ShadowAckStatus status,
                                          cJSON *payload);
 
@@ -224,7 +225,7 @@ DmReturnCode device_management_fini() {
 }
 
 DmReturnCode device_management_create(DeviceManagementClient *client, const char *broker, const char *deviceName,
-                         const char *username, const char *password) {
+                                      const char *username, const char *password) {
     int rc;
     int i;
     uuid_t uuid;
@@ -317,7 +318,8 @@ DmReturnCode device_management_connect(DeviceManagementClient client) {
     }
 }
 
-DmReturnCode device_management_shadow_update(DeviceManagementClient client, ShadowActionCallback callback, void *context,
+DmReturnCode
+device_management_shadow_update(DeviceManagementClient client, ShadowActionCallback callback, void *context,
                                 uint8_t timeout, cJSON *reported) {
     DmReturnCode rc;
 
@@ -337,7 +339,7 @@ DmReturnCode device_management_shadow_update(DeviceManagementClient client, Shad
 }
 
 DmReturnCode device_management_shadow_get(DeviceManagementClient client, ShadowActionCallback callback, void *context,
-                             uint8_t timeout) {
+                                          uint8_t timeout) {
     DmReturnCode rc;
     cJSON *payload = cJSON_CreateObject();
 
@@ -351,8 +353,9 @@ DmReturnCode device_management_shadow_get(DeviceManagementClient client, ShadowA
     return rc;
 }
 
-DmReturnCode device_management_shadow_delete(DeviceManagementClient client, ShadowActionCallback callback, void *context,
-                             uint8_t timeout) {
+DmReturnCode
+device_management_shadow_delete(DeviceManagementClient client, ShadowActionCallback callback, void *context,
+                                uint8_t timeout) {
     DmReturnCode rc;
     cJSON *payload = cJSON_CreateObject();
 
@@ -366,7 +369,8 @@ DmReturnCode device_management_shadow_delete(DeviceManagementClient client, Shad
     return rc;
 }
 
-DmReturnCode device_management_shadow_register_delta(DeviceManagementClient client, const char *key, ShadowPropertyDeltaCallback cb) {
+DmReturnCode device_management_shadow_register_delta(DeviceManagementClient client, const char *key,
+                                                     ShadowPropertyDeltaCallback cb) {
     DmReturnCode rc = SUCCESS;
 
     if (client == NULL || cb == NULL) {
@@ -416,7 +420,7 @@ DmReturnCode device_management_destroy(DeviceManagementClient client) {
     return SUCCESS;
 }
 
-TopicContract * topic_contract_create(const char *deviceName) {
+TopicContract *topic_contract_create(const char *deviceName) {
     int rc;
     TopicContract *t = malloc(sizeof(TopicContract));
     check_malloc_result(t);
@@ -528,14 +532,14 @@ void in_flight_message_house_keep(device_management_client_t *c) {
 
 }
 
-void * in_flight_message_house_keep_proc(void *ignore) {
+void *in_flight_message_house_keep_proc(void *ignore) {
     while (1) {
         client_group_iterate(&allClients, in_flight_message_house_keep);
         sleep(1);
     }
 }
 
-const char * message_get_request_id(const cJSON *payload) {
+const char *message_get_request_id(const cJSON *payload) {
     cJSON *requestId = cJSON_GetObjectItemCaseSensitive(payload, "requestId");
     return requestId->valuestring;
 }
@@ -546,8 +550,8 @@ void exit_null_pointer() {
 }
 
 DmReturnCode in_flight_message_add(InFlightMessageList *table, const char *requestId, ShadowAction action,
-                      ShadowActionCallback callback,
-                      void *context, uint8_t timeout) {
+                                   ShadowActionCallback callback,
+                                   void *context, uint8_t timeout) {
     int rc = TOO_MANY_IN_FLIGHT_MESSAGE;
     int i;
 
@@ -590,7 +594,7 @@ bool device_management_is_connected2(device_management_client_t *c) {
 }
 
 DmReturnCode device_management_shadow_send_json(device_management_client_t *c, const char *topic,
-                                   const char *requestId, cJSON *payload) {
+                                                const char *requestId, cJSON *payload) {
     DmReturnCode dmrc = SUCCESS;
     MQTTAsync_message message = MQTTAsync_message_initializer;
     MQTTAsync_responseOptions *responseOptions;
@@ -616,7 +620,8 @@ DmReturnCode device_management_shadow_send_json(device_management_client_t *c, c
                            requestId);
         dmrc = FAILURE;
     } else {
-        log4c_category_log(category, LOG4C_PRIORITY_TRACE, "\n[>>>>>>>>>>>>\ntopic:\n%s\npayload:\n%s\n>>>>>>>>>>>>>]", topic,
+        log4c_category_log(category, LOG4C_PRIORITY_TRACE, "\n[>>>>>>>>>>>>\ntopic:\n%s\npayload:\n%s\n>>>>>>>>>>>>>]",
+                           topic,
                            string);
 
     }
@@ -626,8 +631,8 @@ DmReturnCode device_management_shadow_send_json(device_management_client_t *c, c
 }
 
 DmReturnCode device_management_shadow_send(DeviceManagementClient client, ShadowAction action, cJSON *payload,
-                              ShadowActionCallback callback,
-                              void *context, uint8_t timeout) {
+                                           ShadowActionCallback callback,
+                                           void *context, uint8_t timeout) {
     const char *topic;
 
     int rc;
@@ -660,8 +665,8 @@ DmReturnCode device_management_shadow_send(DeviceManagementClient client, Shadow
 }
 
 int device_management_shadow_handle_response(device_management_client_t *c, const char *requestId, ShadowAction action,
-                                         ShadowAckStatus status,
-                                         cJSON *payload) {
+                                             ShadowAckStatus status,
+                                             cJSON *payload) {
     int rc = NO_MATCHING_IN_FLIGHT_MESSAGE;
     int i;
     ShadowActionAck ack;
