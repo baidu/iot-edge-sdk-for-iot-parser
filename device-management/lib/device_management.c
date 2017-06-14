@@ -39,7 +39,7 @@
 
 #define SUB_TOPIC_COUNT 7
 
-#define MAX_REQUEST_ID_LENGTH 64
+#define MAX_UUID_LENGTH 64
 
 static const char *log4c_category_name = "device_management";
 
@@ -87,7 +87,7 @@ typedef struct {
 } PropertyHandlerTable;
 
 typedef struct {
-    char requestId[MAX_REQUEST_ID_LENGTH];
+    char requestId[MAX_UUID_LENGTH];
     ShadowAction action;
     ShadowActionCallback callback;
     void *callbackContext;
@@ -223,6 +223,8 @@ DmReturnCode device_management_create(DeviceManagementClient *client, const char
                          const char *username, const char *password) {
     int rc;
     int i;
+    uuid_t uuid;
+    char clientId[MAX_UUID_LENGTH];
 
     if (client == NULL || broker == NULL || deviceName == NULL || username == NULL || password == NULL) {
         return NULL_POINTER;
@@ -232,7 +234,9 @@ DmReturnCode device_management_create(DeviceManagementClient *client, const char
     check_malloc_result(c);
 
     /* Create MQTT client. */
-    rc = MQTTAsync_create(&(c->mqttClient), broker, deviceName, MQTTCLIENT_PERSISTENCE_NONE, NULL);
+    uuid_generate(uuid);
+    uuid_unparse(uuid, clientId);
+    rc = MQTTAsync_create(&(c->mqttClient), broker, clientId, MQTTCLIENT_PERSISTENCE_NONE, NULL);
 
     if (rc == EXIT_FAILURE) {
         log4c_category_log(category, LOG4C_PRIORITY_ERROR, "Failed to create. rc=%d.", rc);
@@ -280,10 +284,15 @@ DmReturnCode device_management_connect(DeviceManagementClient client) {
     connectOptions.context = c;
     connectOptions.connectTimeout = CONNECT_TIMEOUT;
 
+    if (MQTTAsync_isConnected(c->mqttClient)) {
+        log4c_category_log(category, LOG4C_PRIORITY_INFO, "already connected.");
+        return SUCCESS;
+    }
+
     log4c_category_log(category, LOG4C_PRIORITY_INFO, "connecting to server.");
     rc = MQTTAsync_connect(c->mqttClient, &connectOptions);
     if (rc != MQTTASYNC_SUCCESS) {
-        log4c_category_log(category, LOG4C_PRIORITY_ERROR, "Failed to start connecting. rc=%d.", rc);
+        log4c_category_log(category, LOG4C_PRIORITY_ERROR, "failed to start connecting. rc=%d.", rc);
         return FAILURE;
     }
 
@@ -292,8 +301,10 @@ DmReturnCode device_management_connect(DeviceManagementClient client) {
     }
 
     if (MQTTAsync_isConnected(c->mqttClient)) {
-        log4c_category_log(category, LOG4C_PRIORITY_INFO, "MQTT connected.");
-        // TODO: wait sub complete.
+        // Wait sub complete.
+        while (!device_management_is_connected2(c) && c->errorMessage == NULL) {
+            sleep(1);
+        }
         return SUCCESS;
     } else if (c->errorMessage != NULL) {
         log4c_category_log(category, LOG4C_PRIORITY_ERROR, "MQTT connect failed. code=%d, message=%s.", c->errorCode,
@@ -394,6 +405,7 @@ DmReturnCode device_management_destroy(DeviceManagementClient client) {
         MQTTAsync_disconnect(c->mqttClient, NULL);
         MQTTAsync_destroy(&(c->mqttClient));
         topic_contract_destroy(c->topicContract);
+        pthread_mutex_destroy(&(c->mutex));
         free(client);
     }
 
@@ -544,7 +556,7 @@ DmReturnCode in_flight_message_add(InFlightMessageList *table, const char *reque
             table->vault[i].callbackContext = context;
             table->vault[i].timeout = timeout;
             time(&(table->vault[i].timestamp));
-            strncpy(table->vault[i].requestId, requestId, MAX_REQUEST_ID_LENGTH);
+            strncpy(table->vault[i].requestId, requestId, MAX_UUID_LENGTH);
             rc = SUCCESS;
             break;
         }
@@ -618,7 +630,7 @@ DmReturnCode device_management_shadow_send(DeviceManagementClient client, Shadow
     device_management_client_t *c = client;
 
     uuid_t uuid;
-    char requestId[MAX_REQUEST_ID_LENGTH];
+    char requestId[MAX_UUID_LENGTH];
     uuid_generate(uuid);
     uuid_unparse(uuid, requestId);
 
@@ -653,7 +665,7 @@ int device_management_shadow_handle_response(device_management_client_t *c, cons
     pthread_mutex_lock(&(c->messages.mutex));
     for (i = 0; i < MAX_IN_FLIGHT_MESSAGE; ++i) {
         if (!c->messages.vault[i].free &&
-            strncasecmp(c->messages.vault[i].requestId, requestId, MAX_REQUEST_ID_LENGTH) == 0) {
+            strncasecmp(c->messages.vault[i].requestId, requestId, MAX_UUID_LENGTH) == 0) {
             if (status == SHADOW_ACK_ACCEPTED) {
                 ack.accepted.document = payload;
             } else if (status == SHADOW_ACK_REJECTED) {
@@ -724,6 +736,8 @@ void mqtt_on_connected(void *context, char *cause) {
     responseOptions.onFailure = NULL;
     device_management_client_t *c = context;
 
+    log4c_category_log(category, LOG4C_PRIORITY_INFO, "MQTT connected.");
+
     // TODO: on-demand subscribe
     int qos[SUB_TOPIC_COUNT];
     for (i = 0; i < SUB_TOPIC_COUNT; ++i) {
@@ -734,11 +748,15 @@ void mqtt_on_connected(void *context, char *cause) {
         log4c_category_log(category, LOG4C_PRIORITY_ERROR, "Failed to subscribe. rc=%d.", rc);
         return;
     }
-    MQTTAsync_waitForCompletion(c->mqttClient, responseOptions.token, SUBSCRIBE_TIMEOUT * 1000);
-    pthread_mutex_lock(&(c->mutex));
-    c->hasSubscribed = true;
-    pthread_mutex_unlock(&(c->mutex));
-    log4c_category_log(category, LOG4C_PRIORITY_DEBUG, "MQTT subscribed.");
+    rc = MQTTAsync_waitForCompletion(c->mqttClient, responseOptions.token, SUBSCRIBE_TIMEOUT * 1000);
+    if (rc != MQTTASYNC_SUCCESS) {
+        log4c_category_log(category, LOG4C_PRIORITY_ERROR, "subsribe failed. rc=%d.", rc);
+    } else {
+        pthread_mutex_lock(&(c->mutex));
+        c->hasSubscribed = true;
+        pthread_mutex_unlock(&(c->mutex));
+        log4c_category_log(category, LOG4C_PRIORITY_DEBUG, "MQTT subscribed.");
+    }
 }
 
 void mqtt_on_connection_lost(void *context, char *cause) {
@@ -752,19 +770,25 @@ void mqtt_on_connection_lost(void *context, char *cause) {
 
 void mqtt_on_connect_success(void *context, MQTTAsync_successData *response) {
     device_management_client_t *c = context;
+    pthread_mutex_lock(&(c->mutex));
     if (c->errorMessage != NULL) {
         free(c->errorMessage);
         c->errorMessage = NULL;
     }
+    pthread_mutex_unlock(&(c->mutex));
 }
 
 void mqtt_on_connect_failure(void *context, MQTTAsync_failureData *response) {
     device_management_client_t *c = context;
+    pthread_mutex_lock(&(c->mutex));
     if (c->errorMessage != NULL) {
         free(c->errorMessage);
     }
     c->errorCode = response->code;
     c->errorMessage = strdup(response->message);
+    pthread_mutex_unlock(&(c->mutex));
+    log4c_category_log(category, LOG4C_PRIORITY_ERROR, "MQTT connect failed. code=%d, message=%s.", response->code,
+                       response->message);
 }
 
 void mqtt_on_publish_success(void *context, MQTTAsync_successData *response) {

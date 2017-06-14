@@ -32,8 +32,9 @@ apt-get install build-essential gcc make cmake cmake-gui cmake-curses-gui libuui
 mkdir build
 cd build
 cmake ../
+cd lib
 make
-make install
+sudo make install
 ```
 
 ## Libraries
