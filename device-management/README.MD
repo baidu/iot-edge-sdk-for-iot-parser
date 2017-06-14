@@ -1,58 +1,49 @@
-/*
-* Copyright (c) 2016 Baidu, Inc. All Rights Reserved.
-*
-* Licensed to the Apache Software Foundation (ASF) under one or more
-* contributor license agreements.  See the NOTICE file distributed with
-* this work for additional information regarding copyright ownership.
-* The ASF licenses this file to You under the Apache License, Version 2.0
-* (the "License"); you may not use this file except in compliance with
-* the License.  You may obtain a copy of the License at
-*
-*    http://www.apache.org/licenses/LICENSE-2.0
-*
-* Unless required by applicable law or agreed to in writing, software
-* distributed under the License is distributed on an "AS IS" BASIS,
-* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-* See the License for the specific language governing permissions and
-* limitations under the License.
-*/
+# Baidu IoT Edge SDK / Device Management
 
-/**
- * @brief 一个模拟智能茶壶的例子。在这个例子中将用到update shadow，以及按照shadow delta的设定，来控制茶壶的温度。
- * 茶壶的温度可以每秒钟升高/降低1度。
- *
- * @authors Zhao Bo zhaobo03@baidu.com
- */
-#include <stdlib.h>
+## Welcome
+
+
+## Building from source
+### CMake & GNU/Linux
+#### Build requirement
+构建依赖以下工具：
+* CMake
+* gcc
+
+此外，还需要以下库：
+* paho-mqtt-c (https://github.com/eclipse/paho.mqtt.c) - MQTT客户端
+* log4c (http://log4c.sourceforge.net/) - 记录日志
+* cJson (https://github.com/DaveGamble/cJSON) - Json序列化
+* uuid - 生成requestId
+
+如果执行测试，还需要以下库：
+* gtest
+* gmock
+
+在Ubuntu上，可以用命令安装部分依赖。
+```bash
+apt-get install build-essential gcc make cmake cmake-gui cmake-curses-gui libuuid1
+```
+对于paho-mqtt-c，log4c，cJson，则需要我们从源码编译和安装。请点击对应链接，参考具体的构建指南。
+
+#### Build instructions
+```bash
+# 
+mkdir build
+cd build
+cmake ../
+make
+make install
+```
+
+## Libraries
+
+这个 SDK 包含一个动态链接库:
+ * libbaidu-iot-dm.so
+
+## Usage and API
+```
 #include <device_management.h>
-#include <stdio.h>
-#include <zconf.h>
-#include <log4c.h>
-
-static log4c_category_t *category;
-
-void check_return_code(DmReturnCode rc) {
-    if (rc != SUCCESS) {
-        exit(rc);
-    }
-}
-
-static int acceptedAck = 0;
-
-static int rejectedAck = 0;
-
-static int timeoutAck = 0;
-
-void shadow_action_callback(ShadowAction action, ShadowAckStatus status, ShadowActionAck *ack, void *context) {
-    log4c_category_log(category, LOG4C_PRIORITY_INFO, "action callback. action=%d, status=%d.", action, status);
-    if (status == SHADOW_ACK_ACCEPTED) {
-        acceptedAck++;
-    } else if (status == SHADOW_ACK_REJECTED) {
-        rejectedAck++;
-    } else if (status == SHADOW_ACK_TIMEOUT) {
-        timeoutAck++;
-    }
-}
 
 int main() {
     DmReturnCode rc;
@@ -108,3 +99,31 @@ int main() {
     rc = device_management_fini();
     check_return_code(rc);
 }
+```
+
+
+## Logging
+SDK使用log4c来记录日志，category名为device-management。可以通过调整log4c的配置来控制日志输出。
+参见 samples/log4crc。
+```xml
+<?xml version="1.0" encoding="ISO-8859-1"?>
+<!DOCTYPE log4c SYSTEM "">
+<log4c>
+        <config>
+                <bufsize>0</bufsize>
+                <debug level="0"/>
+                <nocleanup>0</nocleanup>
+        </config>
+        <!-- root category ========================================= -->
+        <category name="root" priority="trace" appender="stdout"/>
+        <category name="device_management" priority="trace" appender="stdout"/>
+        <!-- default appenders ===================================== -->
+        <appender name="stdout" type="stream" layout="dated"/>
+        <appender name="stderr" type="stream" layout="dated"/>
+        <appender name="syslog" type="syslog" layout="basic"/>
+        <!-- default layouts ======================================= -->
+        <layout name="basic" type="basic"/>
+        <layout name="dated" type="dated"/>
+</log4c>
+
+```
