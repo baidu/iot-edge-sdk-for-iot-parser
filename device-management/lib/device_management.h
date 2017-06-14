@@ -73,9 +73,20 @@ typedef enum {
     SHADOW_ACK_TIMEOUT,
 } ShadowAckStatus;
 
-/* 如果 GET/UPDATE 被服务器端接受，就会返回一个完整的影子文档 */
+/* 如果 GET/UPDATE 被服务器端接受，就会返回一个ShadowResponse */
 typedef struct {
-    cJSON *document;
+    cJSON *reported;
+    cJSON *desired;
+    struct {
+        cJSON *reported;
+        cJSON *desired;
+    } lastUpdatedTime;
+    int profileVersion;
+} ShadowResponse;
+
+/* 如果 GET/UPDATE 被服务器端接受，就会返回一个ShadowResponse */
+typedef struct {
+    ShadowResponse response;
 } ShadowActionAccepted;
 
 typedef struct {

@@ -27,6 +27,7 @@
 #include "device_management_util.h"
 
 #define _GNU_SOURCE
+#define __USE_GNU
 
 #include <uuid/uuid.h>
 #include <MQTTAsync.h>
@@ -39,9 +40,9 @@
 
 #define SUB_TOPIC_COUNT 7
 
-#define MAX_UUID_LENGTH 64
+#define MAX_UUID_LENGTH 36 + 1 /* According to RFC4122 it has 32 hex digits + 4 dashes. */
 
-static const char *log4c_category_name = "device_management";
+static const char *LO4C_CATEGORY_NAME = "device-management";
 
 static const char *REQUEST_ID_KEY = "requestId";
 
@@ -53,23 +54,23 @@ static const char *REPORTED = "reported";
 
 static const char *TOPIC_PREFIX = "$baidu/iot/shadow";
 
-static volatile bool hasInit = false;
+static volatile bool inited = false;
 
 static log4c_category_t *category = NULL;
 
 /* Memorize all topics device management uses so that we don't compose them each time. */
 typedef struct {
-    char *update;
-    char *updateAccepted;
-    char *updateRejected;
-    char *get;
-    char *getAccepted;
-    char *getRejected;
-    char *delete;
-    char *deleteAccepted;
-    char *deleteRejected;
-    char *delta;
-    char *deltaRejected;
+    char *update; /* publish */
+    char *updateAccepted; /* subscribe */
+    char *updateRejected; /* subscribe */
+    char *get; /* publish */
+    char *getAccepted; /* subscribe */
+    char *getRejected; /* subscribe */
+    char *delete; /* publish */
+    char *deleteAccepted; /* subscribe */
+    char *deleteRejected; /* subscribe */
+    char *delta; /* subscribe */
+    char *deltaRejected; /* publish */
     char *subTopics[SUB_TOPIC_COUNT];
 } TopicContract;
 
@@ -184,7 +185,7 @@ static const char *shadowAckStatusStrings[3] = {"SHADOW_ACK_ACCEPTED", "SHADOW_A
  *
  */
 DmReturnCode device_management_init() {
-    if (hasInit) {
+    if (inited) {
         log4c_category_log(category, LOG4C_PRIORITY_WARN, "already initialized.");
         return SUCCESS;
     }
@@ -194,23 +195,23 @@ DmReturnCode device_management_init() {
         return FAILURE;
     }
 
-    category = log4c_category_new(log4c_category_name);
+    category = log4c_category_new(LO4C_CATEGORY_NAME);
 
     log4c_category_log(category, LOG4C_PRIORITY_INFO, "initialized.");
 
     pthread_mutex_init(&(allClients.mutex), NULL);
     pthread_create(&inFlightMessageKeeper, NULL, in_flight_message_house_keep_proc, NULL);
 
-    hasInit = true;
+    inited = true;
     return SUCCESS;
 }
 
 DmReturnCode device_management_fini() {
-    if (!hasInit) {
+    if (!inited) {
         printf("not initialized. no clean up needed.");
         return SUCCESS;
     }
-    hasInit = false;
+    inited = false;
     // Destroy
     pthread_cancel(inFlightMessageKeeper);
 
@@ -676,7 +677,17 @@ int device_management_shadow_handle_response(device_management_client_t *c, cons
         if (!c->messages.vault[i].free &&
             strncasecmp(c->messages.vault[i].requestId, requestId, MAX_UUID_LENGTH) == 0) {
             if (status == SHADOW_ACK_ACCEPTED) {
-                ack.accepted.document = payload;
+                ack.accepted.response.reported = cJSON_GetObjectItemCaseSensitive(payload, "reported");
+                ack.accepted.response.desired = cJSON_GetObjectItemCaseSensitive(payload, "desired");
+                cJSON *lastUpdatedTime = cJSON_GetObjectItemCaseSensitive(payload, "lastUpdatedTime");
+                if (lastUpdatedTime != NULL) {
+                    ack.accepted.response.lastUpdatedTime.reported = cJSON_GetObjectItemCaseSensitive(lastUpdatedTime,
+                                                                                                      "reported");
+                    ack.accepted.response.lastUpdatedTime.desired = cJSON_GetObjectItemCaseSensitive(lastUpdatedTime,
+                                                                                                      "desired");
+                }
+                ack.accepted.response.profileVersion = cJSON_GetObjectItemCaseSensitive(payload,
+                                                                                        "profileVersion")->valueint;
             } else if (status == SHADOW_ACK_REJECTED) {
                 ack.rejected.code = cJSON_GetObjectItem(payload, CODE_KEY)->valuestring;
                 ack.rejected.message = cJSON_GetObjectItem(payload, MESSAGE_KEY)->valuestring;

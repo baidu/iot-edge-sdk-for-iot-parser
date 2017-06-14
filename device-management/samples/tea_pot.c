@@ -56,28 +56,25 @@ temperature_on_delta(const char *name, struct cJSON *desired) {
     }
 }
 
-void on_get_ack(cJSON *document) {
-    char *string = cJSON_Print(document);
-    log4c_category_log(category, LOG4C_PRIORITY_INFO, "get completed. document:\n%s", string);
-    free(string);
+void on_get_ack(ShadowResponse response) {
+    cJSON *temperature = cJSON_GetObjectItemCaseSensitive(response.desired, "temperature");
+    if (temperature != NULL) {
+        printf("received get of temperature -> %d.\n", temperature->valueint);
+        desiredTemperature = temperature->valueint;
+    }
 }
 
-void on_update_ack(cJSON *document) {
-    char *string = cJSON_Print(document);
-    log4c_category_log(category, LOG4C_PRIORITY_INFO, "update completed. document:\n%s", string);
-    free(string);
+void on_update_ack(ShadowResponse response) {
 }
 
 void shadow_action_callback(ShadowAction action, ShadowAckStatus status, ShadowActionAck *ack, void *context) {
     log4c_category_log(category, LOG4C_PRIORITY_INFO, "action callback. action=%d, status=%d.", action, status);
     if (status == SHADOW_ACK_ACCEPTED) {
         if (action == SHADOW_GET) {
-            on_get_ack(ack->accepted.document);
+            on_get_ack(ack->accepted.response);
         } else if (action == SHADOW_UPDATE) {
-            on_update_ack(ack->accepted.document);
+            on_update_ack(ack->accepted.response);
         }
-        char *document = cJSON_Print(ack->accepted.document);
-        free(document);
     } else if (status == SHADOW_ACK_REJECTED) {
         log4c_category_log(category, LOG4C_PRIORITY_ERROR, "REJECTED: code=%s, message=%s.", ack->rejected.code, ack->rejected.message);
     } else if (status == SHADOW_ACK_TIMEOUT) {
@@ -98,10 +95,10 @@ void change_temperature() {
 
 int main() {
     DmReturnCode rc;
-    const char *broker = "tcp://localhost";
-    const char *username = "test/test";
-    const char *password = "test";
-    const char *deviceName = "tea_pot_1";
+    const char *broker = "tcp://10.73.203.34:8883";
+    const char *username = "05feeb0897064d7fa203660ad53df4e8/zhaobo03-tea-pot";
+    const char *password = "UttRuFbINi0hLfL41ZtTrcaMucGL4OXwu2ws3DpGbx0=";
+    const char *deviceName = "zhaobo03-tea-pot";
     MyContext context;
     bool shouldUpdate;
 
@@ -117,6 +114,9 @@ int main() {
 
     rc = device_management_shadow_register_delta(client, "temperature", temperature_on_delta);
     check_return_code(rc);
+
+    /* 发起一个GET，获取当前desired的值。desired变化的时候我们可以通过delta得到通知，但是初始值只能用GET获取。 */
+    device_management_shadow_get(client, shadow_action_callback, NULL, 10);
 
     cJSON *reported = cJSON_CreateObject();
 
