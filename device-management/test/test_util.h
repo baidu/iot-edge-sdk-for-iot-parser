@@ -31,5 +31,4 @@ public:
     static std::string uuid();
 };
 
-
 #endif //DEVICE_MANAGEMENT_TEST_UTIL_H
