@@ -6,7 +6,7 @@
 #include "test_conf.h"
 #include "test_util.h"
 
-typedef std::function<void (ShadowAction, ShadowAckStatus, ShadowActionAck *, void *)> ActionCallback;
+typedef std::function<void(ShadowAction, ShadowAckStatus, ShadowActionAck *, void *)> ActionCallback;
 
 TEST(InitTest, DoubleInit) {
     device_management_init();
@@ -15,13 +15,27 @@ TEST(InitTest, DoubleInit) {
 }
 
 TEST(InitTest, DoubleFini) {
+    device_management_init();
     device_management_fini();
     device_management_fini();
 }
 
-class UpdateTest: public ::testing::Test {
+TEST(ConnectTest, DoubleConnect) {
+    DeviceManagementClient client;
+    device_management_init();
+
+    device_management_create(&client, TestConf::testMqttBroker.data(), "DoubleConnect",
+                             TestConf::testMqttUsername.data(),
+                             TestConf::testMqttPassword.data());
+    device_management_connect(client);
+    device_management_connect(client);
+    device_management_fini();
+}
+
+class UpdateTest : public ::testing::Test {
 protected:
     virtual void SetUp() override;
+
     virtual void TearDown() override;
 
     std::shared_ptr<DeviceManagementStub> stub;
@@ -39,14 +53,19 @@ void UpdateTest::TearDown() {
 class Listener {
 public:
     virtual void ServerCallBack(const std::string &deviceName, const std::string action) = 0;
+
     virtual void ClientCallback(ShadowAction action, ShadowAckStatus status, ShadowActionAck *ack, void *context) = 0;
 };
 
-class MockListener: public virtual Listener {
+class MockListener : public virtual Listener {
 public:
-    MOCK_METHOD2(ServerCallBack, void(const std::string &deviceName, const std::string action));
+    MOCK_METHOD2(ServerCallBack, void(
+            const std::string &deviceName,
+            const std::string action));
 
-    MOCK_METHOD4(ClientCallback, void(ShadowAction action, ShadowAckStatus status, ShadowActionAck *ack, void *context));
+    MOCK_METHOD4(ClientCallback, void(ShadowAction
+            action, ShadowAckStatus
+            status, ShadowActionAck * ack, void * context));
 
     int called = 0;
 };
@@ -66,14 +85,14 @@ TEST_F(UpdateTest, UpdateHappy) {
         listener.ServerCallBack(deviceName, action);
         listener.called++;
     });
-    EXPECT_CALL(listener,ServerCallBack(deviceName, "update")).Times(1);
+    EXPECT_CALL(listener, ServerCallBack(deviceName, "update")).Times(1);
 
-    ShadowActionCallback cb {[](ShadowAction action, ShadowAckStatus status, ShadowActionAck *ack, void *context) {
+    ShadowActionCallback cb{[](ShadowAction action, ShadowAckStatus status, ShadowActionAck *ack, void *context) {
         MockListener *pListener = static_cast<MockListener *>(context);
         pListener->ClientCallback(action, status, ack, context);
         pListener->called++;
     }};
-    EXPECT_CALL(listener,ClientCallback(SHADOW_UPDATE, SHADOW_ACK_ACCEPTED, testing::_, &listener)).Times(1);
+    EXPECT_CALL(listener, ClientCallback(SHADOW_UPDATE, SHADOW_ACK_ACCEPTED, testing::_, &listener)).Times(1);
 
     cJSON *reported = cJSON_CreateObject();
     cJSON_AddStringToObject(reported, "color", "green");
