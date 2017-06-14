@@ -59,7 +59,7 @@ typedef enum {
 } DmReturnCode;
 
 typedef enum {
-    SHADOW_GET,
+    SHADOW_GET = 0,
     SHADOW_UPDATE,
     SHADOW_DELETE,
     /* 表示一个不合法的 shadow action */
@@ -67,7 +67,7 @@ typedef enum {
 } ShadowAction;
 
 typedef enum {
-    SHADOW_ACK_ACCEPTED,
+    SHADOW_ACK_ACCEPTED = 0,
     SHADOW_ACK_REJECTED,
     /* 在一定时间内没有收到服务器端的 accepted/rejected */
     SHADOW_ACK_TIMEOUT,

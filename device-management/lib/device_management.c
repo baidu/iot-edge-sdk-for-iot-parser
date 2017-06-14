@@ -51,7 +51,7 @@ static const char *MESSAGE_KEY = "message";
 
 static const char *REPORTED = "reported";
 
-static const char *TOPIC_PREFIX = "baidu/iot/shadow";
+static const char *TOPIC_PREFIX = "$baidu/iot/shadow";
 
 static volatile bool hasInit = false;
 
@@ -174,6 +174,10 @@ static int mqtt_on_message_arrived(void *context, char *topicName, int topicLen,
 
 static void mqtt_on_delivery_complete(void *context, MQTTAsync_token token);
 
+static const char *shadowActionStrings[5] = {"SHADOW_GET", "SHADOW_UPDATE", "SHADOW_DELETE", "SHADOW_INVALID"};
+
+static const char *shadowAckStatusStrings[3] = {"SHADOW_ACK_ACCEPTED", "SHADOW_ACK_REJECTED", "SHADOW_ACK_TIMEOUT"};
+
 /**
  * @brief Global initialization of device management client SDK. Not thread safe.
  *
@@ -239,7 +243,7 @@ DmReturnCode device_management_create(DeviceManagementClient *client, const char
     rc = MQTTAsync_create(&(c->mqttClient), broker, clientId, MQTTCLIENT_PERSISTENCE_NONE, NULL);
 
     if (rc == EXIT_FAILURE) {
-        log4c_category_log(category, LOG4C_PRIORITY_ERROR, "Failed to create. rc=%d.", rc);
+        log4c_category_log(category, LOG4C_PRIORITY_ERROR, "Failed to create. MQTT rc=%d.", rc);
         free(c);
         return FAILURE;
     }
@@ -292,7 +296,7 @@ DmReturnCode device_management_connect(DeviceManagementClient client) {
     log4c_category_log(category, LOG4C_PRIORITY_INFO, "connecting to server.");
     rc = MQTTAsync_connect(c->mqttClient, &connectOptions);
     if (rc != MQTTASYNC_SUCCESS) {
-        log4c_category_log(category, LOG4C_PRIORITY_ERROR, "failed to start connecting. rc=%d.", rc);
+        log4c_category_log(category, LOG4C_PRIORITY_ERROR, "failed to start connecting. MQTT rc=%d.", rc);
         return FAILURE;
     }
 
@@ -509,8 +513,8 @@ void in_flight_message_house_keep(device_management_client_t *c) {
         if (!c->messages.vault[i].free) {
             long elipse = difftime(now, c->messages.vault[i].timestamp);
             if (elipse > c->messages.vault[i].timeout) {
-                // TODO: how to log the request id.
-                log4c_category_log(category, LOG4C_PRIORITY_WARN, "request timed out.");
+                log4c_category_log(category, LOG4C_PRIORITY_ERROR, "%s timed out. requestId=%s.",
+                                   shadowActionStrings[c->messages.vault[i].action], c->messages.vault[i].requestId);
                 if (c->messages.vault[i].callback != NULL) {
                     c->messages.vault[i].callback(c->messages.vault[i].action, SHADOW_ACK_TIMEOUT, NULL,
                                                   c->messages.vault[i].callbackContext);
@@ -608,11 +612,11 @@ DmReturnCode device_management_shadow_send_json(device_management_client_t *c, c
 
     rc = MQTTAsync_sendMessage(c->mqttClient, topic, &message, responseOptions);
     if (rc != MQTTASYNC_SUCCESS) {
-        log4c_category_log(category, LOG4C_PRIORITY_ERROR, "failed to send message. rc=%d, requestId=%s.", rc,
+        log4c_category_log(category, LOG4C_PRIORITY_ERROR, "failed to send message. MQTT rc=%d, requestId=%s.", rc,
                            requestId);
         dmrc = FAILURE;
     } else {
-        log4c_category_log(category, LOG4C_PRIORITY_TRACE, "\n[>>>>>>\ntopic:\n%s\npayload:\n%s\n >>>>>>]", topic,
+        log4c_category_log(category, LOG4C_PRIORITY_TRACE, "\n[>>>>>>>>>>>>\ntopic:\n%s\npayload:\n%s\n>>>>>>>>>>>>>]", topic,
                            string);
 
     }
@@ -745,12 +749,12 @@ void mqtt_on_connected(void *context, char *cause) {
     }
     rc = MQTTAsync_subscribeMany(c->mqttClient, SUB_TOPIC_COUNT, c->topicContract->subTopics, qos, &responseOptions);
     if (rc != MQTTASYNC_SUCCESS) {
-        log4c_category_log(category, LOG4C_PRIORITY_ERROR, "Failed to subscribe. rc=%d.", rc);
+        log4c_category_log(category, LOG4C_PRIORITY_ERROR, "Failed to subscribe. MQTT rc=%d.", rc);
         return;
     }
     rc = MQTTAsync_waitForCompletion(c->mqttClient, responseOptions.token, SUBSCRIBE_TIMEOUT * 1000);
     if (rc != MQTTASYNC_SUCCESS) {
-        log4c_category_log(category, LOG4C_PRIORITY_ERROR, "subsribe failed. rc=%d.", rc);
+        log4c_category_log(category, LOG4C_PRIORITY_ERROR, "subsribe failed. MQTT rc=%d.", rc);
     } else {
         pthread_mutex_lock(&(c->mutex));
         c->hasSubscribed = true;
@@ -765,7 +769,6 @@ void mqtt_on_connection_lost(void *context, char *cause) {
     pthread_mutex_lock(&(c->mutex));
     c->hasSubscribed = false;
     pthread_mutex_unlock(&(c->mutex));
-    // TODO: I've set auto-connect to true. Should I manually re-connect here?
 }
 
 void mqtt_on_connect_success(void *context, MQTTAsync_successData *response) {
@@ -802,8 +805,8 @@ void mqtt_on_publish_failure(void *context, MQTTAsync_failureData *response) {
 }
 
 void mqtt_on_delivery_complete(void *context, MQTTAsync_token dt) {
-    // TODO: anything to do?
     device_management_client_t *c = context;
+    // Nothing to do.
 }
 
 int mqtt_on_message_arrived(void *context, char *topicName, int topicLen, MQTTAsync_message *message) {
@@ -818,7 +821,7 @@ int mqtt_on_message_arrived(void *context, char *topicName, int topicLen, MQTTAs
         strncpy(jsonString, message->payload, message->payloadlen);
         jsonString[message->payloadlen] = '\0';
     }
-    log4c_category_log(category, LOG4C_PRIORITY_TRACE, "\n[<<<<<<\ntopic:\n%s\npayload:\n%s\n <<<<<<]",
+    log4c_category_log(category, LOG4C_PRIORITY_TRACE, "\n[<<<<<<<<<<<<\ntopic:\n%s\npayload:\n%s\n<<<<<<<<<<<<<]",
                        topicName, jsonString);
     cJSON *payload = cJSON_Parse(jsonString);
     if (jsonString != message->payload) {

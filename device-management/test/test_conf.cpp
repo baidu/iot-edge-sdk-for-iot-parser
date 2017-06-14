@@ -6,4 +6,4 @@ const std::string TestConf::testMqttUsername("test/test");
 
 const std::string TestConf::testMqttPassword("test");
 
-const std::string TestConf::topicPrefix("baidu/iot/shadow/");
+const std::string TestConf::topicPrefix("$baidu/iot/shadow/");
