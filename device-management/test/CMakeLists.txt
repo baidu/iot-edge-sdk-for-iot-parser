@@ -13,7 +13,7 @@ set(LIBS ${LIBS} ${GMOCK_LIBRARIES})
 include_directories(${device-management_SOURCE_DIR}/lib)
 link_directories(${device-management_BINARY_DIR}/lib)
 
-add_executable(update-test test_conf.h test_conf.cpp integration_test.cpp smart_birdcage.cpp smart_birdcage.h device_management_stub.cpp device_management_stub.h test_util.cpp test_util.h)
+add_executable(update-test test_conf.h test_conf.cpp integration_test.cpp device_management_stub.cpp device_management_stub.h test_util.cpp test_util.h)
 
 #target_link_libraries(update-test baidu-iot-dm gtest gtest_main ${PAHOCPP_LIBRARIES})
 target_link_libraries(update-test baidu-iot-dm gtest gtest_main gmock)
