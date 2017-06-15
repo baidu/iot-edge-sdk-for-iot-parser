@@ -137,10 +137,11 @@ DmReturnCode device_management_fini();
  * @param deviceName 设备名字
  * @param username MQTT 用户名
  * @param password MQTT 密码
+ * @param trustStore 文件名。不打开SSL的时候可以传NULL。
  * @return
  */
 DmReturnCode device_management_create(DeviceManagementClient *client, const char *broker, const char *deviceName,
-                                      const char *username, const char *password);
+                                      const char *username, const char *password, const char *trustStore);
 
 /**
  * @brief 连接客户端至服务器
