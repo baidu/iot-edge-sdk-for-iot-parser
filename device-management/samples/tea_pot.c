@@ -95,10 +95,10 @@ void change_temperature() {
 
 int main() {
     DmReturnCode rc;
-    const char *broker = "tcp://10.73.203.34:8883";
-    const char *username = "05feeb0897064d7fa203660ad53df4e8/zhaobo03-tea-pot";
-    const char *password = "UttRuFbINi0hLfL41ZtTrcaMucGL4OXwu2ws3DpGbx0=";
-    const char *deviceName = "zhaobo03-tea-pot";
+    const char *broker = "tcp://127.0.0.1:8883"; /* Change to correct address before run. */
+    const char *username = "05feeb0897064d7fa203660ad53df4e8/test-tea-pot";
+    const char *password = "NtsgATi5GIe5p7cq7KtBYz3DZT2TQZXkQkXn9lt4FIE=";
+    const char *deviceName = "test-tea-pot";
     MyContext context;
     bool shouldUpdate;
 
