@@ -75,7 +75,8 @@ void shadow_action_callback(ShadowAction action, ShadowAckStatus status, ShadowA
             on_update_ack(ack->accepted.response);
         }
     } else if (status == SHADOW_ACK_REJECTED) {
-        log4c_category_log(category, LOG4C_PRIORITY_ERROR, "REJECTED: code=%s, message=%s.", ack->rejected.code, ack->rejected.message);
+        log4c_category_log(category, LOG4C_PRIORITY_ERROR, "REJECTED: code=%s, message=%s.", ack->rejected.code,
+                           ack->rejected.message);
     } else if (status == SHADOW_ACK_TIMEOUT) {
     }
 }
@@ -124,7 +125,7 @@ int main() {
     cJSON_AddItemToObject(reported, "temperature", temp);
 
     int i = 0;
-    for(int i = 0; i < 60; ++i) {
+    for (int i = 0; i < 60; ++i) {
         sleep(1);
         if (desiredTemperature < 0) {
             continue;
@@ -137,6 +138,8 @@ int main() {
             check_return_code(rc);
         }
     }
+
+    sleep(15);
 
     cJSON_Delete(reported);
 
