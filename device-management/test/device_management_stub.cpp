@@ -165,7 +165,6 @@ int DeviceManagementStubImpl::message_arrived(void *context, char *topicName, in
 
 void DeviceManagementStubImpl::connection_lost(void *context, char *cause) {
     DeviceManagementStubImpl *impl = static_cast<DeviceManagementStubImpl *>(context);
-
 }
 
 void DeviceManagementStubImpl::delivery_complete(void *context, MQTTClient_deliveryToken tok) {

@@ -125,7 +125,7 @@ int main() {
     cJSON_AddItemToObject(reported, "temperature", temp);
 
     int i = 0;
-    for (int i = 0; i < 60; ++i) {
+    for (i = 0; i < 60; ++i) {
         sleep(1);
         if (desiredTemperature < 0) {
             continue;
