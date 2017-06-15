@@ -320,6 +320,8 @@ DmReturnCode device_management_connect(DeviceManagementClient client) {
                            c->errorMessage);
         return FAILURE;
     }
+
+    return SUCCESS;
 }
 
 DmReturnCode
@@ -470,6 +472,8 @@ TopicContract *topic_contract_create(const char *deviceName) {
     rc = asprintf(&(t->delta), "%s/%s/delta", TOPIC_PREFIX, deviceName);
     rc = asprintf(&(t->deltaRejected), "%s/%s/delta/rejected", TOPIC_PREFIX, deviceName);
     t->subTopics[6] = t->delta;
+
+    return t;
 }
 
 void topic_contract_destroy(TopicContract *topics) {
@@ -542,7 +546,7 @@ void in_flight_message_house_keep(device_management_client_t *c) {
     pthread_mutex_lock(&(c->messages.mutex));
     for (i = 0; i < MAX_IN_FLIGHT_MESSAGE; ++i) {
         if (!c->messages.vault[i].free) {
-            long elipse = difftime(now, c->messages.vault[i].timestamp);
+            double elipse = difftime(now, c->messages.vault[i].timestamp);
             if (elipse > c->messages.vault[i].timeout) {
                 log4c_category_log(category, LOG4C_PRIORITY_ERROR, "%s timed out. requestId=%s.",
                                    shadowActionStrings[c->messages.vault[i].action], c->messages.vault[i].requestId);
@@ -579,7 +583,7 @@ void exit_null_pointer() {
 DmReturnCode in_flight_message_add(InFlightMessageList *table, const char *requestId, ShadowAction action,
                                    ShadowActionCallback callback,
                                    void *context, uint8_t timeout) {
-    int rc = TOO_MANY_IN_FLIGHT_MESSAGE;
+    DmReturnCode rc = TOO_MANY_IN_FLIGHT_MESSAGE;
     int i;
 
     pthread_mutex_lock(&(table->mutex));
@@ -662,7 +666,7 @@ DmReturnCode device_management_shadow_send(DeviceManagementClient client, Shadow
                                            void *context, uint8_t timeout) {
     const char *topic;
 
-    int rc;
+    DmReturnCode rc;
     device_management_client_t *c = client;
 
     uuid_t uuid;
@@ -682,13 +686,11 @@ DmReturnCode device_management_shadow_send(DeviceManagementClient client, Shadow
     }
 
     rc = in_flight_message_add(&(c->messages), requestId, action, callback, context, timeout);
-    if (rc != SUCCESS) {
-        return rc;
+    if (rc == SUCCESS) {
+        device_management_shadow_send_json(c, topic, requestId, payload);
     }
 
-    device_management_shadow_send_json(c, topic, requestId, payload);
-
-    return SUCCESS;
+    return rc;
 }
 
 int device_management_shadow_handle_response(device_management_client_t *c, const char *requestId, ShadowAction action,
@@ -796,7 +798,7 @@ void mqtt_on_connected(void *context, char *cause) {
     }
     rc = MQTTAsync_waitForCompletion(c->mqttClient, responseOptions.token, SUBSCRIBE_TIMEOUT * 1000);
     if (rc != MQTTASYNC_SUCCESS) {
-        log4c_category_log(category, LOG4C_PRIORITY_ERROR, "subsribe failed. MQTT rc=%d.", rc);
+        log4c_category_log(category, LOG4C_PRIORITY_ERROR, "subscribe failed. MQTT rc=%d.", rc);
     } else {
         pthread_mutex_lock(&(c->mutex));
         c->hasSubscribed = true;
@@ -847,7 +849,6 @@ void mqtt_on_publish_failure(void *context, MQTTAsync_failureData *response) {
 }
 
 void mqtt_on_delivery_complete(void *context, MQTTAsync_token dt) {
-    device_management_client_t *c = context;
     // Nothing to do.
 }
 

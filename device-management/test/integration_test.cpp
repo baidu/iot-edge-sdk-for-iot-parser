@@ -94,8 +94,8 @@ TEST_F(UpdateTest, UpdateHappy) {
     device_management_init();
     DeviceManagementClient client;
     std::string seed = TestUtil::uuid();
-    std::string deviceName = "UpdateHappy-" + seed;
-    device_management_create(&client, TestConf::testMqttBroker.data(), deviceName.data(),
+    std::string testDeviceName = "UpdateHappy-" + seed;
+    device_management_create(&client, TestConf::testMqttBroker.data(), testDeviceName.data(),
                              TestConf::testMqttUsername.data(), TestConf::testMqttPassword.data());
     device_management_connect(client);
 
@@ -105,7 +105,7 @@ TEST_F(UpdateTest, UpdateHappy) {
         listener.ServerCallBack(deviceName, action);
         listener.called++;
     });
-    EXPECT_CALL(listener, ServerCallBack(deviceName, "update")).Times(1);
+    EXPECT_CALL(listener, ServerCallBack(testDeviceName, "update")).Times(1);
 
     ShadowActionCallback cb{[](ShadowAction action, ShadowAckStatus status, ShadowActionAck *ack, void *context) {
         MockListener *pListener = static_cast<MockListener *>(context);
