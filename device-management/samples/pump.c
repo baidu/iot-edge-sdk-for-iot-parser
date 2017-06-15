@@ -60,7 +60,6 @@ int main() {
     const char *username = "test/test";
     const char *password = "test";
     const char *deviceName = "pump1";
-    bool shouldUpdate;
 
     device_management_init();
 
