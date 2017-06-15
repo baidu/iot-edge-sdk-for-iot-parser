@@ -92,7 +92,7 @@ int main() {
     cJSON_AddItemToObject(reported, "Output_voltage", outputVoltage);
     cJSON_AddItemToObject(reported, "Drive-temp", driveTemp);
 
-    rc = device_management_shadow_update(client, shadow_action_callback, NULL, 10, reported);
+    rc = device_management_shadow_update(client, shadow_action_callback, NULL, 10, reported, NULL);
     check_return_code(rc);
     // 设备影子的更新是异步的,device_management_shadow_update返回并不等于已经收到服务器端的响应.
     // 在这个示例中,我们在一个loop中等待收到ACK.

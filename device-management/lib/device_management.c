@@ -52,6 +52,8 @@ static const char *MESSAGE_KEY = "message";
 
 static const char *REPORTED = "reported";
 
+static const char *DESIRED = "desired";
+
 static const char *TOPIC_PREFIX = "$baidu/iot/shadow";
 
 static volatile bool inited = false;
@@ -321,16 +323,28 @@ DmReturnCode device_management_connect(DeviceManagementClient client) {
 
 DmReturnCode
 device_management_shadow_update(DeviceManagementClient client, ShadowActionCallback callback, void *context,
-                                uint8_t timeout, cJSON *reported) {
+                                uint8_t timeout, cJSON *reported, cJSON *desired) {
     DmReturnCode rc;
 
-    cJSON *payload = cJSON_CreateObject();
+    cJSON *payload;
 
-    cJSON_AddItemToObject(payload, REPORTED, reported);
+    if (reported == NULL && desired == NULL) {
+        return NULL_POINTER;
+    }
+
+    payload = cJSON_CreateObject();
+
+    if (reported != NULL) {
+        cJSON_AddItemToObject(payload, REPORTED, reported);
+    }
+    if (desired != NULL) {
+        cJSON_AddItemToObject(payload, DESIRED, desired);
+    }
 
     rc = device_management_shadow_send(client, SHADOW_UPDATE, payload, callback, context, timeout);
 
     cJSON_DetachItemViaPointer(payload, reported);
+    cJSON_DetachItemViaPointer(payload, desired);
     cJSON_Delete(payload);
 
     if (rc != SUCCESS) {
@@ -621,7 +635,7 @@ DmReturnCode device_management_shadow_send_json(device_management_client_t *c, c
                            requestId);
         dmrc = FAILURE;
     } else {
-        log4c_category_log(category, LOG4C_PRIORITY_TRACE, "\n[>>>>>>>>>>>>\ntopic:\n%s\npayload:\n%s\n>>>>>>>>>>>>>]",
+        log4c_category_log(category, LOG4C_PRIORITY_TRACE, "sending message \n>>topic:\n%s\n>>payload:\n%s",
                            topic,
                            string);
 
@@ -837,7 +851,7 @@ int mqtt_on_message_arrived(void *context, char *topicName, int topicLen, MQTTAs
         strncpy(jsonString, message->payload, message->payloadlen);
         jsonString[message->payloadlen] = '\0';
     }
-    log4c_category_log(category, LOG4C_PRIORITY_TRACE, "\n[<<<<<<<<<<<<\ntopic:\n%s\npayload:\n%s\n<<<<<<<<<<<<<]",
+    log4c_category_log(category, LOG4C_PRIORITY_TRACE, "received message \n<<topic:\n%s\n<<payload:\n%s",
                        topicName, jsonString);
     cJSON *payload = cJSON_Parse(jsonString);
     if (jsonString != message->payload) {
