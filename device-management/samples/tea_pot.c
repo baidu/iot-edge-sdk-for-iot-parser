@@ -95,7 +95,7 @@ void change_temperature() {
 
 int main() {
     DmReturnCode rc;
-    const char *broker = "tcp://127.0.0.1:8883"; /* Change to correct address before run. */
+    const char *broker = "tcp://sandbox.mqtt.iot.gz.baidubce.com:8883"; /* Change to correct address before run. */
     const char *username = "05feeb0897064d7fa203660ad53df4e8/test-tea-pot";
     const char *password = "NtsgATi5GIe5p7cq7KtBYz3DZT2TQZXkQkXn9lt4FIE=";
     const char *deviceName = "test-tea-pot";
@@ -107,7 +107,7 @@ int main() {
     category = log4c_category_new("tea-pot");
 
     DeviceManagementClient client;
-    rc = device_management_create(&client, broker, deviceName, username, password);
+    rc = device_management_create(&client, broker, deviceName, username, password, NULL);
     check_return_code(rc);
     rc = device_management_connect(client);
     check_return_code(rc);

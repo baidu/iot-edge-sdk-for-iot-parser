@@ -113,6 +113,7 @@ typedef struct device_management_client_t {
     char *username;
     char *password;
     char *deviceName;
+    char *trustStore;
     TopicContract *topicContract;
     PropertyHandlerTable properties;
     InFlightMessageList messages;
@@ -229,7 +230,7 @@ DmReturnCode device_management_fini() {
 }
 
 DmReturnCode device_management_create(DeviceManagementClient *client, const char *broker, const char *deviceName,
-                                      const char *username, const char *password) {
+                                      const char *username, const char *password, const char *trustStore) {
     int rc;
     int i;
     uuid_t uuid;
@@ -262,6 +263,7 @@ DmReturnCode device_management_create(DeviceManagementClient *client, const char
     c->username = strdup(username);
     c->password = strdup(password);
     c->deviceName = strdup(deviceName);
+    c->trustStore = trustStore == NULL ? NULL : strdup(trustStore);
     c->topicContract = topic_contract_create(deviceName);
     c->properties.index = 0;
     pthread_mutex_init(&(c->properties.mutex), NULL);
@@ -292,6 +294,13 @@ DmReturnCode device_management_connect(DeviceManagementClient client) {
     connectOptions.onFailure = mqtt_on_connect_failure;
     connectOptions.context = c;
     connectOptions.connectTimeout = CONNECT_TIMEOUT;
+
+    MQTTAsync_SSLOptions sslOptions = MQTTAsync_SSLOptions_initializer;
+    if (c->trustStore != NULL) {
+        sslOptions.trustStore = c->trustStore;
+        sslOptions.enableServerCertAuth = false;
+        connectOptions.ssl = &sslOptions;
+    }
 
     if (MQTTAsync_isConnected(c->mqttClient)) {
         log4c_category_log(category, LOG4C_PRIORITY_INFO, "already connected.");
@@ -434,6 +443,7 @@ DmReturnCode device_management_destroy(DeviceManagementClient client) {
         safe_free(&(c->username));
         safe_free(&(c->password));
         safe_free(&(c->deviceName));
+        safe_free(&(c->trustStore));
         safe_free(&(c->errorMessage));
         free(c->errorMessage);
         MQTTAsync_disconnect(c->mqttClient, NULL);

@@ -56,17 +56,18 @@ void shadow_action_callback(ShadowAction action, ShadowAckStatus status, ShadowA
 
 int main() {
     DmReturnCode rc;
-    const char *broker = "tcp://localhost";
-    const char *username = "test/test";
-    const char *password = "test";
-    const char *deviceName = "pump1";
+    const char *broker = "ssl://samples.mqtt.iot.gz.baidubce.com:1884";
+    const char *username = "test/test"; /* 设置为您设备的用户名 */
+    const char *password = "test"; /* 设置为您设备的密码 */
+    const char *deviceName = "pump1"; /* 设置为您设备的名字 */
 
     device_management_init();
 
     category = log4c_category_new("pump");
 
     DeviceManagementClient client;
-    rc = device_management_create(&client, broker, deviceName, username, password);
+    /* 设置为正确的root_cert.pem路径. git repository根目录有一份该文件。*/
+    rc = device_management_create(&client, broker, deviceName, username, password, "./root_cert.pem");
     check_return_code(rc);
     rc = device_management_connect(client);
     check_return_code(rc);
