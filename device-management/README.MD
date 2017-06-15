@@ -45,6 +45,21 @@ sudo make install
 ## Usage and API
 ```
 #include <device_management.h>
+#include <cjson.h>
+
+static int acceptedAck = 0;
+static int rejectedAck = 0;
+static int timeoutAck = 0;
+
+void shadow_action_callback(ShadowAction action, ShadowAckStatus status, ShadowActionAck *ack, void *context) {
+    if (status == SHADOW_ACK_ACCEPTED) {
+        acceptedAck++;
+    } else if (status == SHADOW_ACK_REJECTED) {
+        rejectedAck++;
+    } else if (status == SHADOW_ACK_TIMEOUT) {
+        timeoutAck++;
+    }
+}
 
 int main() {
     DmReturnCode rc;
@@ -52,17 +67,12 @@ int main() {
     const char *username = "test/test";
     const char *password = "test";
     const char *deviceName = "pump1";
-    bool shouldUpdate;
 
     device_management_init();
 
-    category = log4c_category_new("pump");
-
     DeviceManagementClient client;
     rc = device_management_create(&client, broker, deviceName, username, password);
-    check_return_code(rc);
     rc = device_management_connect(client);
-    check_return_code(rc);
 
     cJSON *reported = cJSON_CreateObject();
 
@@ -85,7 +95,6 @@ int main() {
     cJSON_AddItemToObject(reported, "Drive-temp", driveTemp);
 
     rc = device_management_shadow_update(client, shadow_action_callback, NULL, 10, reported);
-    check_return_code(rc);
     // 设备影子的更新是异步的,device_management_shadow_update返回并不等于已经收到服务器端的响应.
     // 在这个示例中,我们在一个loop中等待收到ACK.
     while (acceptedAck + rejectedAck + timeoutAck < 1) {
@@ -95,13 +104,11 @@ int main() {
     cJSON_Delete(reported);
 
     rc = device_management_destroy(client);
-    check_return_code(rc);
 
     rc = device_management_fini();
-    check_return_code(rc);
 }
 ```
-
+以上示例代码来源自samples/pump.c
 
 ## Logging
 SDK使用log4c来记录日志，category名为device-management。可以通过调整log4c的配置来控制日志输出。
