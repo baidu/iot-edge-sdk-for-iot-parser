@@ -18,21 +18,21 @@ set(LIBS ${LIBS} ${PAHO_LIBRARIES})
 
 find_package(Threads)
 
-find_library(OPENSSL_LIB NAMES ssl libssl ssleay32
-        HINTS ${OPENSSL_SEARCH_PATH}/lib ${OPENSSL_SEARCH_PATH}/lib64)
+if (USE_SSL)
+    find_package(OpenSSL REQUIRED)
+    set(LIBS ${LIBS} ${OPENSSL_LIBRARIES})
+endif (USE_SSL)
 
 add_library(${DM_LIBRARY_NAME} SHARED
         device_management.c device_management.h
         device_management_util.c device_management_util.h
         device_management_conf.h)
 
-target_link_libraries(${DM_LIBRARY_NAME} ${LIBUUID_LIBRARIES} ${LOG4C_LIBRARIES} ${CJSON_LIBRARIES} ${PAHO_LIBRARIES} ${CMAKE_THREAD_LIBS_INIT})
+target_link_libraries(${DM_LIBRARY_NAME} ${LIBUUID_LIBRARIES} ${LOG4C_LIBRARIES} ${CJSON_LIBRARIES} ${PAHO_LIBRARIES} ${OPENSSL_LIBRARIES} ${CMAKE_THREAD_LIBS_INIT})
 set_target_properties(
         ${DM_LIBRARY_NAME} PROPERTIES
         VERSION ${VERSION}
         SOVERSION ${VERSION_MAJOR})
 
-#INSTALL(FILES device_management.h DESTINATION include)
-#install(FILES device_management.h DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}/${LIB_DIR_NAME}")
-#install(TARGETS "${DM_LIBRARY_NAME}" DESTINATION "${CMAKE_INSTALL_LIBDIR}/${LIB_DIR_NAME}" EXPORT "${DM_LIBRARY_NAME}")
+INSTALL(FILES device_management.h DESTINATION include)
 INSTALL(TARGETS ${DM_LIBRARY_NAME} ARCHIVE DESTINATION lib LIBRARY DESTINATION lib)

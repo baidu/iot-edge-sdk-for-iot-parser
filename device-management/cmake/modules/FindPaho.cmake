@@ -30,27 +30,51 @@ else (PAHO_LIBRARIES AND PAHO_INCLUDE_DIRS)
             )
     mark_as_advanced(PAHO_INCLUDE_DIR)
 
-    find_library(PAHO_LIBRARY
-            NAMES
-            paho-mqtt3c
-            PATHS
-            /usr/lib
-            /usr/local/lib
-            /opt/local/lib
-            /sw/lib
-            )
-    mark_as_advanced(PAHO_LIBRARY)
+    if (USE_SSL)
+        find_library(PAHO_LIBRARY
+                NAMES
+                paho-mqtt3cs
+                PATHS
+                /usr/lib
+                /usr/local/lib
+                /opt/local/lib
+                /sw/lib
+                )
+        mark_as_advanced(PAHO_LIBRARY)
 
-    find_library(PAHOA_LIBRARY
-            NAMES
-            paho-mqtt3a
-            PATHS
-            /usr/lib
-            /usr/local/lib
-            /opt/local/lib
-            /sw/lib
-            )
-    mark_as_advanced(PAHOA_LIBRARY)
+        find_library(PAHOA_LIBRARY
+                NAMES
+                paho-mqtt3as
+                PATHS
+                /usr/lib
+                /usr/local/lib
+                /opt/local/lib
+                /sw/lib
+                )
+        mark_as_advanced(PAHOA_LIBRARY)
+    else (USE_SSL)
+        find_library(PAHO_LIBRARY
+                NAMES
+                paho-mqtt3c
+                PATHS
+                /usr/lib
+                /usr/local/lib
+                /opt/local/lib
+                /sw/lib
+                )
+        mark_as_advanced(PAHO_LIBRARY)
+
+        find_library(PAHOA_LIBRARY
+                NAMES
+                paho-mqtt3a
+                PATHS
+                /usr/lib
+                /usr/local/lib
+                /opt/local/lib
+                /sw/lib
+                )
+        mark_as_advanced(PAHOA_LIBRARY)
+    endif (USE_SSL)
 
     if (PAHO_LIBRARY)
         set(PAHO_FOUND TRUE CACHE INTERNAL "Wether the PAHO library has been found" FORCE)
