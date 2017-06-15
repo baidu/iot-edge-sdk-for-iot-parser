@@ -68,7 +68,6 @@ void on_update_ack(ShadowResponse response) {
 }
 
 void shadow_action_callback(ShadowAction action, ShadowAckStatus status, ShadowActionAck *ack, void *context) {
-    log4c_category_log(category, LOG4C_PRIORITY_INFO, "action callback. action=%d, status=%d.", action, status);
     if (status == SHADOW_ACK_ACCEPTED) {
         if (action == SHADOW_GET) {
             on_get_ack(ack->accepted.response);
@@ -134,7 +133,7 @@ int main() {
         shouldUpdate = alwaysUpdate || temp->valueint != actualTemperature;
         if (shouldUpdate) {
             cJSON_SetIntValue(temp, actualTemperature);
-            rc = device_management_shadow_update(client, shadow_action_callback, &context, 10, reported);
+            rc = device_management_shadow_update(client, shadow_action_callback, &context, 10, reported, NULL);
             check_return_code(rc);
         }
     }

@@ -164,11 +164,12 @@ DmReturnCode device_management_destroy(DeviceManagementClient client);
  * @param callback 完成之后的回调
  * @param context 传递给回调的上下文
  * @param timeout 为这个请求指定一个超时时间。单位为秒。
- * @param reported 要上报的内容
+ * @param reported 要上报的内容，设备端会上报。
+ * @param desired 期待值，控制端会发送。设备端调用update的时候，该参数一般为NULL。
  * @return 代码
  */
 DmReturnCode device_management_shadow_update(DeviceManagementClient client, ShadowActionCallback callback, void *context,
-                                uint8_t timeout, cJSON *reported);
+                                uint8_t timeout, cJSON *reported, cJSON *desired);
 
 /**
  * @brief 获取设备影子

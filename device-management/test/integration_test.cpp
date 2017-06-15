@@ -24,7 +24,6 @@
 #include <gtest/gtest.h>
 #include <gmock/gmock.h>
 #include <device_management.h>
-#include <uuid/uuid.h>
 #include "device_management_stub.h"
 #include "test_conf.h"
 #include "test_util.h"
@@ -119,7 +118,7 @@ TEST_F(UpdateTest, UpdateHappy) {
 
     cJSON *reported = cJSON_CreateObject();
     cJSON_AddStringToObject(reported, "color", "green");
-    device_management_shadow_update(client, cb, &listener, 10, reported);
+    device_management_shadow_update(client, cb, &listener, 10, reported, NULL);
     cJSON_Delete(reported);
 
     for (int i = 0; i < 60; ++i) {
