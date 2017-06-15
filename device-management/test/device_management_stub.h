@@ -33,13 +33,16 @@ class DeviceManagementStubImpl;
 
 class DeviceManagementStub {
 public:
-    typedef std::function<void (const std::string &, const std::string &)> CallBack;
+    typedef std::function<void(const std::string &, const std::string &)> CallBack;
 
     static std::shared_ptr<DeviceManagementStub> create();
 
     virtual void start() = 0;
+
     virtual void setAutoResponse(bool value) = 0;
+
     virtual void addListener(CallBack f) = 0;
+
     virtual void clearListeners() = 0;
 };
 

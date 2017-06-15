@@ -34,11 +34,13 @@
 #include "test_conf.h"
 #include "test_util.h"
 
-class DeviceManagementStubImpl: public DeviceManagementStub {
+class DeviceManagementStubImpl : public DeviceManagementStub {
 public:
     DeviceManagementStubImpl(const std::string &broker, const std::string &username, const std::string &password,
                              const std::string &clientId);
+
     virtual ~DeviceManagementStubImpl();
+
     void start();
 
     virtual void setAutoResponse(bool value) override;
@@ -52,7 +54,7 @@ private:
     std::string password;
     MQTTClient client;
 
-    bool autoResponse;
+    bool autoRespond;
     std::list<CallBack> callbacks;
     std::mutex callbackMutex;
 
@@ -88,7 +90,7 @@ DeviceManagementStubImpl::DeviceManagementStubImpl(const std::string &broker, co
                                                    const std::string &password, const std::string &clientId) :
         username(username), password(password) {
     MQTTClient_create(&client, broker.data(), clientId.data(), MQTTCLIENT_PERSISTENCE_NONE, NULL);
-    autoResponse = true;
+    autoRespond = true;
 }
 
 DeviceManagementStubImpl::~DeviceManagementStubImpl() {
@@ -109,7 +111,7 @@ void DeviceManagementStubImpl::start() {
 }
 
 void DeviceManagementStubImpl::setAutoResponse(bool value) {
-    autoResponse = value;
+    autoRespond = value;
 }
 
 void DeviceManagementStubImpl::addListener(CallBack f) {
@@ -123,7 +125,7 @@ void DeviceManagementStubImpl::clearListeners() {
 }
 
 int DeviceManagementStubImpl::message_arrived(void *context, char *topicName, int topicLen,
-                                               MQTTClient_message *message) {
+                                              MQTTClient_message *message) {
     DeviceManagementStubImpl *impl = static_cast<DeviceManagementStubImpl *>(context);
     std::cmatch results;
     bool matched = std::regex_match(topicName, results, topicRegex, std::regex_constants::match_default);
@@ -171,14 +173,16 @@ void DeviceManagementStubImpl::delivery_complete(void *context, MQTTClient_deliv
 }
 
 void DeviceManagementStubImpl::processUpdate(const std::string &device, const std::string requestId, cJSON *document) {
-    boost::format format(acceptedFormat);
-    std::string topic = boost::str(format % device % update);
-    cJSON *json = cJSON_CreateObject();
-    cJSON_AddStringToObject(json, "requestId", requestId.data());
-    char *payload = cJSON_Print(json);
-    // Send ack
-    MQTTClient_publish(client, topic.data(), strlen(payload) + 1, payload, 1, 0, NULL);
-    free(payload);
+    if (autoRespond) {
+        boost::format format(acceptedFormat);
+        std::string topic = boost::str(format % device % update);
+        cJSON *json = cJSON_CreateObject();
+        cJSON_AddStringToObject(json, "requestId", requestId.data());
+        char *payload = cJSON_Print(json);
+        // Send ack
+        MQTTClient_publish(client, topic.data(), strlen(payload) + 1, payload, 1, 0, NULL);
+        free(payload);
+    }
 }
 
 std::shared_ptr<DeviceManagementStub> DeviceManagementStub::create() {

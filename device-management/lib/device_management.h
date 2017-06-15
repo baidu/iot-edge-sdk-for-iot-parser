@@ -102,6 +102,7 @@ typedef union {
 typedef struct {
     const char *code;
     const char *message;
+
     /* 如何释放这个 error */
     void (*destroyer)(void *error);
 } UserDefinedError;
@@ -139,7 +140,7 @@ DmReturnCode device_management_fini();
  * @return
  */
 DmReturnCode device_management_create(DeviceManagementClient *client, const char *broker, const char *deviceName,
-                         const char *username, const char *password);
+                                      const char *username, const char *password);
 
 /**
  * @brief 连接客户端至服务器
@@ -168,7 +169,8 @@ DmReturnCode device_management_destroy(DeviceManagementClient client);
  * @param desired 期待值，控制端会发送。设备端调用update的时候，该参数一般为NULL。
  * @return 代码
  */
-DmReturnCode device_management_shadow_update(DeviceManagementClient client, ShadowActionCallback callback, void *context,
+DmReturnCode
+device_management_shadow_update(DeviceManagementClient client, ShadowActionCallback callback, void *context,
                                 uint8_t timeout, cJSON *reported, cJSON *desired);
 
 /**
@@ -181,7 +183,7 @@ DmReturnCode device_management_shadow_update(DeviceManagementClient client, Shad
  * @return 代码
  */
 DmReturnCode device_management_shadow_get(DeviceManagementClient client, ShadowActionCallback callback, void *context,
-                             uint8_t timeout);
+                                          uint8_t timeout);
 
 /**
  * @brief 删除设备影子
@@ -192,8 +194,9 @@ DmReturnCode device_management_shadow_get(DeviceManagementClient client, ShadowA
  * @param timeout 为这个请求指定一个超时时间。单位为秒。
  * @return 代码
  */
-DmReturnCode device_management_shadow_delete(DeviceManagementClient client, ShadowActionCallback callback, void *context,
-                             uint8_t timeout);
+DmReturnCode
+device_management_shadow_delete(DeviceManagementClient client, ShadowActionCallback callback, void *context,
+                                uint8_t timeout);
 
 /**
  * @brief 为某一个属性注册一个回调，在这个属性的 desired 值变化时，得到通知。
@@ -204,7 +207,8 @@ DmReturnCode device_management_shadow_delete(DeviceManagementClient client, Shad
  * @param timeout 为这个请求指定一个超时时间。单位为秒。
  * @return 代码
  */
-DmReturnCode device_management_shadow_register_delta(DeviceManagementClient client, const char *key, ShadowPropertyDeltaCallback cb);
+DmReturnCode
+device_management_shadow_register_delta(DeviceManagementClient client, const char *key, ShadowPropertyDeltaCallback cb);
 
 #ifdef __cplusplus
 }

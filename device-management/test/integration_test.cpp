@@ -28,8 +28,6 @@
 #include "test_conf.h"
 #include "test_util.h"
 
-typedef std::function<void(ShadowAction, ShadowAckStatus, ShadowActionAck *, void *)> ActionCallback;
-
 TEST(InitTest, DoubleInit) {
     device_management_init();
     device_management_init();

@@ -1,4 +1,4 @@
-project (device-management)
+project(device-management)
 
 cmake_minimum_required(VERSION 2.8)
 
@@ -10,7 +10,7 @@ set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/cmake/modules/")
 set(CMAKE_INSTALL_LIBDIR "/usr/local/lib")
 set(CMAKE_INSTALL_INCLUDEDIR, /usr/local/include)
 
-add_definitions (-DCMAKE -DVERSION=\"${VERSION}\")
+add_definitions(-DCMAKE -DVERSION=\"${VERSION}\")
 
 add_subdirectory(lib)
 add_subdirectory(samples)

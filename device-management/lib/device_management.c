@@ -77,7 +77,7 @@ typedef struct {
 } TopicContract;
 
 typedef struct {
-    const char *key; // key 可以为NULL，表示匹配根。
+    char *key; // key 可以为NULL，表示匹配根。
     ShadowPropertyDeltaCallback cb; // 收到更新之后，会调用这个回调。
 } ShadowPropertyDeltaHandler;
 
@@ -216,6 +216,7 @@ DmReturnCode device_management_fini() {
     inited = false;
     // Destroy
     pthread_cancel(inFlightMessageKeeper);
+    pthread_join(inFlightMessageKeeper, NULL);
 
     log4c_category_log(category, LOG4C_PRIORITY_INFO, "cleaned up.");
 
@@ -415,10 +416,18 @@ DmReturnCode device_management_shadow_register_delta(DeviceManagementClient clie
 }
 
 DmReturnCode device_management_destroy(DeviceManagementClient client) {
+    uint32_t i;
     device_management_client_t *c = client;
     if (c == NULL) {
         log4c_category_log(category, LOG4C_PRIORITY_ERROR, "bad client.");
     } else {
+        pthread_mutex_lock(&(c->properties.mutex));
+        for (i = 0; i < c->properties.index; ++i) {
+            safe_free(&(c->properties.vault[i].key));
+        }
+        c->properties.index = 0;
+        pthread_mutex_unlock(&(c->properties.mutex));
+
         client_group_remove(&allClients, c);
         safe_free(&(c->username));
         safe_free(&(c->password));
@@ -471,6 +480,9 @@ void topic_contract_destroy(TopicContract *topics) {
         safe_free(&(topics->get));
         safe_free(&(topics->getAccepted));
         safe_free(&(topics->getRejected));
+        safe_free(&(topics->delete));
+        safe_free(&(topics->deleteAccepted));
+        safe_free(&(topics->deleteRejected));
         safe_free(&(topics->delta));
         safe_free(&(topics->deltaRejected));
         free(topics);
@@ -698,7 +710,7 @@ int device_management_shadow_handle_response(device_management_client_t *c, cons
                     ack.accepted.response.lastUpdatedTime.reported = cJSON_GetObjectItemCaseSensitive(lastUpdatedTime,
                                                                                                       "reported");
                     ack.accepted.response.lastUpdatedTime.desired = cJSON_GetObjectItemCaseSensitive(lastUpdatedTime,
-                                                                                                      "desired");
+                                                                                                     "desired");
                 }
                 ack.accepted.response.profileVersion = cJSON_GetObjectItemCaseSensitive(payload,
                                                                                         "profileVersion")->valueint;
