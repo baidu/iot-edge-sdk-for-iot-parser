@@ -20,7 +20,7 @@
 /**
  * @brief internal helper functions.
  *
- * @authors Zhao Bo zhaobo03@baidu.com
+ * @authors Zhao Bo
  */
 #ifndef DEVICE_MANAGEMENT_UTIL_H
 #define DEVICE_MANAGEMENT_UTIL_H

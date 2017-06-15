@@ -20,7 +20,7 @@
 /**
  * @brief compiling time configuration of device management SDK.
  *
- * @authors Zhao Bo zhaobo03@baidu.com
+ * @authors Zhao Bo
  */
 #ifndef DEVICE_MANAGEMENT_CONF_H
 #define DEVICE_MANAGEMENT_CONF_H

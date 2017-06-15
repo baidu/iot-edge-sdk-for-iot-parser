@@ -20,7 +20,7 @@
 /**
  * @brief implementation of device management SDK.
  *
- * @authors Zhao Bo zhaobo03@baidu.com
+ * @authors Zhao Bo
  */
 #include "device_management.h"
 #include "device_management_conf.h"
