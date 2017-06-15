@@ -18,7 +18,7 @@
 */
 
 /**
- * @authors Zhao Bo zhaobo03@baidu.com
+ * @authors Zhao Bo
  */
 
 #ifndef DEVICE_MANAGEMENT_TEST_UTIL_H

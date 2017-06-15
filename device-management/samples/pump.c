@@ -21,7 +21,7 @@
  * @brief 一个模拟智能茶壶的例子。在这个例子中将用到update shadow，以及按照shadow delta的设定，来控制茶壶的温度。
  * 茶壶的温度可以每秒钟升高/降低1度。
  *
- * @authors Zhao Bo zhaobo03@baidu.com
+ * @authors Zhao Bo
  */
 #include <stdlib.h>
 #include <device_management.h>

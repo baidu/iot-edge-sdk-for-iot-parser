@@ -20,7 +20,7 @@
 /**
  * @brief internal helper functions.
  *
- * @authors Zhao Bo zhaobo03@baidu.com
+ * @authors Zhao Bo
  */
 #include <stdio.h>
 #include <log4c.h>

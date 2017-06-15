@@ -20,7 +20,7 @@
 /**
  * @brief Stub of device management server.
  *
- * @authors Zhao Bo zhaobo03@baidu.com
+ * @authors Zhao Bo
  */
 #include "device_management_stub.h"
 #include <regex>
