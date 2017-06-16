@@ -1,7 +1,14 @@
 # Baidu IoT Edge SDK / Device Management
 
-## Welcome
+## Installation
+### Ubuntu 64bit
+如果您使用的是Ubuntu 64bit操作系统，可以这里下载我们发布的安装包：https://github.com/baidu/iot-edge-sdk-for-iot-parser/releases
 
+下载所有的zip文件并unzip之后：
+```bash
+sudo apt-get install libuuid1 libssl-dev
+sudo dpkg -i libcjson_1.5.2-1_amd64.deb liblog4c_1.2.4-1_amd64.deb libpaho-mqtt-c_1.1.0-1_amd64.deb libbaiduiot-dm_1.0.1-1_amd64.deb
+```
 
 ## Building from source
 ### CMake & GNU/Linux
@@ -24,7 +31,7 @@
 ```bash
 apt-get install build-essential gcc make cmake cmake-gui cmake-curses-gui libuuid1
 ```
-对于paho-mqtt-c，log4c，cJson，则需要我们从源码编译和安装。请点击对应链接，参考具体的构建指南。
+对于paho-mqtt-c，log4c，cJson，则需要我们从源码编译和安装。请点击对应链接，参考具体的构建指南。如果您使用的是Ubuntu 64bit操作系统，也从这里下载安装包：https://github.com/baidu/iot-edge-sdk-for-iot-parser/releases
 
 #### Build instructions
 ```bash
