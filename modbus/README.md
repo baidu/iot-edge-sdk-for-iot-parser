@@ -21,7 +21,7 @@ readable.
 云端接受到数据后，根据用户在云端配置的解析设置，将数据解析成明文数据。
 
 Finally, parsed modbus package is archived into BOS or MQTT topic, for later use.
-最后，解析后的数据存入BOS，或者另外一个MQTT主题，一遍进行后续处理或使用。
+最后，解析后的数据存入BOS，或者另外一个MQTT主题，以便进行后续处理或使用。
 
 Installation
 ------------
@@ -93,7 +93,7 @@ A more detailed step by step guide could be found at [here](https://cloud.baidu.
 **modbus.response**为网关采集到的原始modbus数据。
 **modbus.parsedResponse**为空，后面经过云端解析后，会填上。
 
-在云端解析之后，会变成如下格式（填上了modbus.parsedResponse）:
+在云端解析之后，会变成如下格式（填上了modbus.parsedResponse和metrics字段）:
 ```
 {
     "bdModbusVer": 1,
@@ -125,7 +125,12 @@ A more detailed step by step guide could be found at [here](https://cloud.baidu.
         ],
         "error": null
     },
-    "timestamp": "2016-10-23 22:07:17-0700"
+    "timestamp": "2016-10-23 22:07:17-0700",
+    "metrics": {
+        "chiller pressure": 1,
+        "water flow": 2
+    },
+    "misc": null
 }
 ```
 解析后的数据，根据解析项目里面的设置，会存入BOS或者目的地主题，如果对接了规则引擎写TSDB，后面还会写入TSDB。
