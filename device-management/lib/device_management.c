@@ -233,8 +233,6 @@ DmReturnCode device_management_create(DeviceManagementClient *client, const char
                                       const char *username, const char *password, const char *trustStore) {
     int rc;
     int i;
-    uuid_t uuid;
-    char clientId[MAX_UUID_LENGTH];
 
     if (client == NULL || broker == NULL || deviceName == NULL || username == NULL || password == NULL) {
         return NULL_POINTER;
@@ -243,10 +241,8 @@ DmReturnCode device_management_create(DeviceManagementClient *client, const char
     device_management_client_t *c = malloc(sizeof(device_management_client_t));
     check_malloc_result(c);
 
-    /* Create MQTT client. */
-    uuid_generate(uuid);
-    uuid_unparse(uuid, clientId);
-    rc = MQTTAsync_create(&(c->mqttClient), broker, clientId, MQTTCLIENT_PERSISTENCE_NONE, NULL);
+    /* Create MQTT client. Use device name as client ID. */
+    rc = MQTTAsync_create(&(c->mqttClient), broker, deviceName, MQTTCLIENT_PERSISTENCE_NONE, NULL);
 
     if (rc == EXIT_FAILURE) {
         log4c_category_log(category, LOG4C_PRIORITY_ERROR, "Failed to create. MQTT rc=%d.", rc);
