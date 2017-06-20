@@ -130,7 +130,7 @@ TEST_F(UpdateTest, UpdateHappy) {
     device_management_shadow_update(client, cb, &listener, 10, reported, NULL);
     cJSON_Delete(reported);
 
-    for (int i = 0; i < 60; ++i) {
+    for (int i = 0; i < 20; ++i) {
         if (listener.called == 2) {
             break;
         }

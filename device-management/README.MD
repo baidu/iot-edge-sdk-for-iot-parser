@@ -133,7 +133,7 @@ SDK使用log4c来记录日志，category名为device-management。可以通过�
         </config>
         <!-- root category ========================================= -->
         <category name="root" priority="trace" appender="stdout"/>
-        <category name="device_management" priority="trace" appender="stdout"/>
+        <category name="device-management" priority="trace" appender="stdout"/>
         <!-- default appenders ===================================== -->
         <appender name="stdout" type="stream" layout="dated"/>
         <appender name="stderr" type="stream" layout="dated"/>

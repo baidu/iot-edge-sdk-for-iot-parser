@@ -40,7 +40,7 @@
 
 #define SUB_TOPIC_COUNT 7
 
-#define MAX_UUID_LENGTH 36 + 1 /* According to RFC4122 it has 32 hex digits + 4 dashes. */
+#define MAX_UUID_LENGTH (36 + 1) /* According to RFC4122 it has 32 hex digits + 4 dashes. */
 
 static const char *LO4C_CATEGORY_NAME = "device-management";
 
@@ -575,9 +575,10 @@ void *in_flight_message_house_keep_proc(void *ignore) {
     }
 }
 
+static const char *EMPTY_UUID = "00000000-0000-0000-0000-000000000000";
 const char *message_get_request_id(const cJSON *payload) {
     cJSON *requestId = cJSON_GetObjectItemCaseSensitive(payload, "requestId");
-    return requestId->valuestring;
+    return requestId != NULL ? requestId->valuestring : EMPTY_UUID;
 }
 
 void exit_null_pointer() {
@@ -725,8 +726,16 @@ int device_management_shadow_handle_response(device_management_client_t *c, cons
                                                                                             "profileVersion")->valueint;
                 }
             } else if (status == SHADOW_ACK_REJECTED) {
-                ack.rejected.code = cJSON_GetObjectItem(payload, CODE_KEY)->valuestring;
-                ack.rejected.message = cJSON_GetObjectItem(payload, MESSAGE_KEY)->valuestring;
+                cJSON *code = cJSON_GetObjectItem(payload, CODE_KEY);
+                cJSON *message = cJSON_GetObjectItem(payload, MESSAGE_KEY);
+                if (code == NULL || message == NULL) {
+                    log4c_category_log(category, LOG4C_PRIORITY_WARN, "bad rejected message.");
+                    ack.rejected.code = NULL;
+                    ack.rejected.message = NULL;
+                } else {
+                    ack.rejected.code = code->valuestring;
+                    ack.rejected.message = message->valuestring;
+                }
             }
             c->messages.vault[i].callback(action, status, &ack, c->messages.vault[i].callbackContext);
             c->messages.vault[i].free = true;
@@ -833,17 +842,25 @@ void mqtt_on_connect_success(void *context, MQTTAsync_successData *response) {
     pthread_mutex_unlock(&(c->mutex));
 }
 
+static const char *UNKNOWN_FAILURE = "Unknown MQTT connection failure.";
 void mqtt_on_connect_failure(void *context, MQTTAsync_failureData *response) {
     device_management_client_t *c = context;
     pthread_mutex_lock(&(c->mutex));
     if (c->errorMessage != NULL) {
         free(c->errorMessage);
     }
-    c->errorCode = response->code;
-    c->errorMessage = strdup(response->message);
+    if (response != NULL) {
+        c->errorCode = response->code;
+        c->errorMessage = strdup(response->message);
+        log4c_category_log(category, LOG4C_PRIORITY_ERROR, "MQTT connect failed. code=%d, message=%s.", response->code,
+                           response->message);
+    } else {
+        c->errorCode = 0;
+        c->errorMessage = strdup(UNKNOWN_FAILURE);
+        log4c_category_log(category, LOG4C_PRIORITY_ERROR, "MQTT connect failed.");
+    }
     pthread_mutex_unlock(&(c->mutex));
-    log4c_category_log(category, LOG4C_PRIORITY_ERROR, "MQTT connect failed. code=%d, message=%s.", response->code,
-                       response->message);
+
 }
 
 void mqtt_on_publish_success(void *context, MQTTAsync_successData *response) {
