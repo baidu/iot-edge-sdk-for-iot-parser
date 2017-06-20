@@ -203,9 +203,8 @@ device_management_shadow_delete(DeviceManagementClient client, ShadowActionCallb
  * @brief 为某一个属性注册一个回调，在这个属性的 desired 值变化时，得到通知。
  *
  * @param client 物管理客户端
- * @param callback 完成之后的回调
- * @param context 传递给回调的上下文
- * @param timeout 为这个请求指定一个超时时间。单位为秒。
+ * @param key 属性名字。传NULL则表示为整个shadow注册一个回调。
+ * @param cb 收到delta之后的回调
  * @return 代码
  */
 DmReturnCode

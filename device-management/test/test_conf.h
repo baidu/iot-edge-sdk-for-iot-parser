@@ -28,11 +28,11 @@
 
 class TestConf {
 public:
-    static const std::string testMqttBroker;
-    static const std::string testMqttUsername;
-    static const std::string testMqttPassword;
 
-    static const std::string topicPrefix;
+    static const std::string &getTestMqttBroker();
+    static const std::string &getTestMqttUsername();
+    static const std::string &getTestMqttPassword();
+    static const std::string &getTopicPrefix();
 };
 
 #endif //TEST_CONF_H

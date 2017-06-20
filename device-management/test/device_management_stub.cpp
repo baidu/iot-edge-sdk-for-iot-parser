@@ -76,15 +76,15 @@ private:
 };
 
 // First group matches device name and second group matches action.
-const std::regex DeviceManagementStubImpl::topicRegex = std::regex(TestConf::topicPrefix + "(.*)/(.*)");
+const std::regex DeviceManagementStubImpl::topicRegex = std::regex(std::string("\\$baidu/iot/shadow/") + "([^/]*)/([^/]*)");
 
 const std::string DeviceManagementStubImpl::update = "update";
 
 const std::string DeviceManagementStubImpl::requestIdKey = "requestId";
 
-const std::string DeviceManagementStubImpl::acceptedFormat = TestConf::topicPrefix + "%s/%s/accepted";
+const std::string DeviceManagementStubImpl::acceptedFormat = TestConf::getTopicPrefix() + "%s/%s/accepted";
 
-const std::string DeviceManagementStubImpl::rejectedFormat = TestConf::topicPrefix + "%s/%s/rejected";
+const std::string DeviceManagementStubImpl::rejectedFormat = TestConf::getTopicPrefix() + "%s/%s/rejected";
 
 DeviceManagementStubImpl::DeviceManagementStubImpl(const std::string &broker, const std::string &username,
                                                    const std::string &password, const std::string &clientId) :
@@ -106,7 +106,7 @@ void DeviceManagementStubImpl::start() {
     options.password = password.data();
     MQTTClient_setCallbacks(client, this, connection_lost, message_arrived, delivery_complete);
     MQTTClient_connect(client, &options);
-    std::string topicFilter = TestConf::topicPrefix + "+/update";
+    std::string topicFilter = TestConf::getTopicPrefix() + "+/update";
     MQTTClient_subscribe(client, topicFilter.data(), 1);
 }
 
@@ -177,6 +177,7 @@ void DeviceManagementStubImpl::processUpdate(const std::string &device, const st
         std::string topic = boost::str(format % device % update);
         cJSON *json = cJSON_CreateObject();
         cJSON_AddStringToObject(json, "requestId", requestId.data());
+        cJSON_AddNumberToObject(json, "profileVersion", 1);
         char *payload = cJSON_Print(json);
         // Send ack
         MQTTClient_publish(client, topic.data(), strlen(payload) + 1, payload, 1, 0, NULL);
@@ -186,8 +187,8 @@ void DeviceManagementStubImpl::processUpdate(const std::string &device, const st
 
 std::shared_ptr<DeviceManagementStub> DeviceManagementStub::create() {
     return std::shared_ptr<DeviceManagementStub>(
-            new DeviceManagementStubImpl(TestConf::testMqttBroker,
-                                         TestConf::testMqttUsername,
-                                         TestConf::testMqttPassword,
+            new DeviceManagementStubImpl(TestConf::getTestMqttBroker(),
+                                         TestConf::getTestMqttUsername(),
+                                         TestConf::getTestMqttPassword(),
                                          TestUtil::uuid()));
 }

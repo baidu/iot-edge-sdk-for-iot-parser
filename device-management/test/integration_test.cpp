@@ -24,9 +24,19 @@
 #include <gtest/gtest.h>
 #include <gmock/gmock.h>
 #include <device_management.h>
+#include <log4c.h>
 #include "device_management_stub.h"
 #include "test_conf.h"
 #include "test_util.h"
+#include <regex>
+/*
+ * Below test will fail. Seems it's a bug of log4c.
+TEST(Log4cTest, DoubleInit) {
+    log4c_init();
+    log4c_fini();
+    log4c_init();
+}
+*/
 
 TEST(InitTest, DoubleInit) {
     device_management_init();
@@ -44,9 +54,9 @@ TEST(ConnectTest, DoubleConnect) {
     DeviceManagementClient client;
     device_management_init();
 
-    device_management_create(&client, TestConf::testMqttBroker.data(), "DoubleConnect",
-                             TestConf::testMqttUsername.data(),
-                             TestConf::testMqttPassword.data(), NULL);
+    device_management_create(&client, TestConf::getTestMqttBroker().data(), "DoubleConnect",
+                             TestConf::getTestMqttUsername().data(),
+                             TestConf::getTestMqttPassword().data(), NULL);
     device_management_connect(client);
     device_management_connect(client);
     device_management_fini();
@@ -64,6 +74,7 @@ protected:
 void UpdateTest::SetUp() {
     stub = DeviceManagementStub::create();
     stub->start();
+    stub->setAutoResponse(true);
 }
 
 void UpdateTest::TearDown() {
@@ -95,8 +106,8 @@ TEST_F(UpdateTest, UpdateHappy) {
     DeviceManagementClient client;
     std::string seed = TestUtil::uuid();
     std::string testDeviceName = "UpdateHappy-" + seed;
-    device_management_create(&client, TestConf::testMqttBroker.data(), testDeviceName.data(),
-                             TestConf::testMqttUsername.data(), TestConf::testMqttPassword.data(), NULL);
+    device_management_create(&client, TestConf::getTestMqttBroker().data(), testDeviceName.data(),
+                             TestConf::getTestMqttUsername().data(), TestConf::getTestMqttPassword().data(), NULL);
     device_management_connect(client);
 
     MockListener listener;

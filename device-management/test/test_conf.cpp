@@ -23,10 +23,24 @@
 
 #include "test_conf.h"
 
-const std::string TestConf::testMqttBroker("tcp://localhost");
+const std::string &TestConf::getTestMqttBroker() {
+    static std::string broker = "tcp://localhost";
+    return broker;
+}
 
-const std::string TestConf::testMqttUsername("test/test");
+const std::string &TestConf::getTestMqttUsername() {
+    static std::string username = "test/test";
+    return username;
+}
 
-const std::string TestConf::testMqttPassword("test");
+const std::string &TestConf::getTestMqttPassword() {
+    static std::string password = "test";
+    return password;
+}
 
-const std::string TestConf::topicPrefix("$baidu/iot/shadow/");
+const std::string &TestConf::getTopicPrefix() {
+    static std::string prefix = "$baidu/iot/shadow/";
+    return prefix;
+}
+
+//const std::string TestConf::topicPrefix;

@@ -225,7 +225,6 @@ DmReturnCode device_management_fini() {
     if (category != NULL) {
         log4c_category_delete(category);
     }
-    log4c_fini();
     return SUCCESS;
 }
 
@@ -720,8 +719,11 @@ int device_management_shadow_handle_response(device_management_client_t *c, cons
                     ack.accepted.response.lastUpdatedTime.desired = cJSON_GetObjectItemCaseSensitive(lastUpdatedTime,
                                                                                                      "desired");
                 }
-                ack.accepted.response.profileVersion = cJSON_GetObjectItemCaseSensitive(payload,
-                                                                                        "profileVersion")->valueint;
+                cJSON *profileVersion = cJSON_GetObjectItemCaseSensitive(payload, "profileVersion");
+                if (profileVersion != NULL) {
+                    ack.accepted.response.profileVersion = cJSON_GetObjectItemCaseSensitive(payload,
+                                                                                            "profileVersion")->valueint;
+                }
             } else if (status == SHADOW_ACK_REJECTED) {
                 ack.rejected.code = cJSON_GetObjectItem(payload, CODE_KEY)->valuestring;
                 ack.rejected.message = cJSON_GetObjectItem(payload, MESSAGE_KEY)->valuestring;

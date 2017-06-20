@@ -26,6 +26,7 @@ sudo dpkg -i libcjson_1.5.2-1_amd64.deb liblog4c_1.2.4-1_amd64.deb libpaho-mqtt-
 如果执行测试，还需要以下库：
 * gtest
 * gmock
+* libboost-dev
 
 在Ubuntu上，可以用命令安装部分依赖。
 ```bash
