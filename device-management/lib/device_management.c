@@ -471,8 +471,8 @@ TopicContract *topic_contract_create(const char *deviceName) {
     rc = asprintf(&(t->delete), "%s/%s/delete", TOPIC_PREFIX, deviceName);
     rc = asprintf(&(t->deleteAccepted), "%s/%s/delete/accepted", TOPIC_PREFIX, deviceName);
     rc = asprintf(&(t->deleteRejected), "%s/%s/delete/rejected", TOPIC_PREFIX, deviceName);
-    t->subTopics[4] = t->getAccepted;
-    t->subTopics[5] = t->getRejected;
+    t->subTopics[4] = t->deleteAccepted;
+    t->subTopics[5] = t->deleteRejected;
 
     rc = asprintf(&(t->delta), "%s/%s/delta", TOPIC_PREFIX, deviceName);
     rc = asprintf(&(t->deltaRejected), "%s/%s/delta/rejected", TOPIC_PREFIX, deviceName);
@@ -679,6 +679,11 @@ DmReturnCode device_management_shadow_send(DeviceManagementClient client, Shadow
     char requestId[MAX_UUID_LENGTH];
     uuid_generate(uuid);
     uuid_unparse(uuid, requestId);
+
+    if (!device_management_is_connected2(c)) {
+        log4c_category_log(category, LOG4C_PRIORITY_WARN, "can't send message to server when client is not connected.");
+        return NOT_CONNECTED;
+    }
 
     if (action == SHADOW_UPDATE) {
         topic = client->topicContract->update;
@@ -920,6 +925,13 @@ int mqtt_on_message_arrived(void *context, char *topicName, int topicLen, MQTTAs
             } else if (strncasecmp(c->topicContract->getRejected, topicName, strlen(c->topicContract->getRejected)) ==
                        0) {
                 action = SHADOW_GET;
+                status = SHADOW_ACK_REJECTED;
+            } else if (strncasecmp(c->topicContract->deleteAccepted, topicName, strlen(c->topicContract->deleteAccepted)) ==
+                       0) {
+                action = SHADOW_DELETE;
+            } else if (strncasecmp(c->topicContract->deleteRejected, topicName, strlen(c->topicContract->deleteRejected)) ==
+                       0) {
+                action = SHADOW_DELETE;
                 status = SHADOW_ACK_REJECTED;
             } else {
                 log4c_category_log(category, LOG4C_PRIORITY_ERROR, "Unexpected topic %s.", topicName);
