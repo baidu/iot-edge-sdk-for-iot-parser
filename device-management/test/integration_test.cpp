@@ -137,4 +137,5 @@ TEST_F(UpdateTest, UpdateHappy) {
         sleep(1);
     }
     ASSERT_EQ(2, listener.called);
+    device_management_fini();
 }

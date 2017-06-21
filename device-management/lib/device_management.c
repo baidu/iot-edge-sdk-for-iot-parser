@@ -42,6 +42,8 @@
 
 #define MAX_UUID_LENGTH (36 + 1) /* According to RFC4122 it has 32 hex digits + 4 dashes. */
 
+#define URI_SSL "ssl://"
+
 static const char *LO4C_CATEGORY_NAME = "device-management";
 
 static const char *REQUEST_ID_KEY = "requestId";
@@ -215,7 +217,7 @@ DmReturnCode device_management_init() {
     pthread_mutexattr_settype(&attr, PTHREAD_MUTEX_RECURSIVE);
     pthread_mutex_init(&(allClients.mutex), NULL);
     pthread_create(&inFlightMessageKeeper, NULL, in_flight_message_house_keep_proc, NULL);
-
+    pthread_mutexattr_destroy(&attr);
     inited = true;
     return SUCCESS;
 }
@@ -246,6 +248,12 @@ DmReturnCode device_management_create(DeviceManagementClient *client, const char
 
     if (client == NULL || broker == NULL || deviceName == NULL || username == NULL || password == NULL) {
         return NULL_POINTER;
+    }
+
+    if (strncmp(URI_SSL, broker, strlen(URI_SSL)) == 0) {
+        if (trustStore == NULL) {
+            return NULL_POINTER;
+        }
     }
 
     device_management_client_t *c = malloc(sizeof(device_management_client_t));
@@ -285,6 +293,7 @@ DmReturnCode device_management_create(DeviceManagementClient *client, const char
 
     pthread_mutex_init(&(c->messages.mutex), &attr);
     pthread_mutex_init(&(c->mutex), &attr);
+    pthread_mutexattr_destroy(&attr);
     client_group_add(&allClients, c);
     *client = c;
 
