@@ -80,7 +80,7 @@ int main() {
 
     DeviceManagementClient client;
     /* 设置为正确的root_cert.pem路径. git repository根目录有一份该文件。*/
-    rc = device_management_create(&client, broker, deviceName, username, password, "./root_cert.pem");
+    rc = device_management_create(&client, broker, deviceName, username, password, NULL, "./root_cert.pem");
     rc = device_management_connect(client);
 
     cJSON *reported = cJSON_CreateObject();

@@ -56,7 +56,7 @@ TEST(ConnectTest, DoubleConnect) {
 
     device_management_create(&client, TestConf::getTestMqttBroker().data(), "DoubleConnect",
                              TestConf::getTestMqttUsername().data(),
-                             TestConf::getTestMqttPassword().data(), NULL);
+                             TestConf::getTestMqttPassword().data(), NULL, NULL);
     device_management_connect(client);
     device_management_connect(client);
     device_management_fini();
@@ -107,7 +107,7 @@ TEST_F(UpdateTest, UpdateHappy) {
     std::string seed = TestUtil::uuid();
     std::string testDeviceName = "UpdateHappy-" + seed;
     device_management_create(&client, TestConf::getTestMqttBroker().data(), testDeviceName.data(),
-                             TestConf::getTestMqttUsername().data(), TestConf::getTestMqttPassword().data(), NULL);
+                             TestConf::getTestMqttUsername().data(), TestConf::getTestMqttPassword().data(), NULL, NULL);
     device_management_connect(client);
 
     MockListener listener;

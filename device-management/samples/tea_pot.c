@@ -107,7 +107,7 @@ int main() {
     category = log4c_category_new("tea-pot");
 
     DeviceManagementClient client;
-    rc = device_management_create(&client, broker, deviceName, username, password, NULL);
+    rc = device_management_create(&client, broker, deviceName, username, password, NULL, NULL);
     check_return_code(rc);
     rc = device_management_connect(client);
     check_return_code(rc);
