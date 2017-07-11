@@ -29,20 +29,24 @@ sudo apt-get --yes --force-yes install autoconf
 echo "3, install libtool"
 sudo apt-get --yes --force-yes install libtool
 
-# 4, make a temp dir
-echo "4, make a temp dir"
+# 4 install make
+sudo "4. install make"
+sudo apt-get --yes --force-yes install make
+
+#5, make a temp dir
+echo "5, make a temp dir"
 mkdir ~/deps
 
-# 5, download and install cJSON
-echo "5, download and install cJSON"
+# 6, download and install cJSON
+echo "6, download and install cJSON"
 cd ~/deps
 git clone https://github.com/DaveGamble/cJSON.git
 cd cJSON
 make
 sudo make install
 
-# 6, download and install paho.mqtt.c
-echo "6, download and install paho.mqtt.c"
+# 7, download and install paho.mqtt.c
+echo "7, download and install paho.mqtt.c"
 cd ~/deps
 git clone https://github.com/eclipse/paho.mqtt.c.git
 cp paho.mqtt.c/src/VersionInfo.h.in paho.mqtt.c/src/VersionInfo.h
@@ -51,9 +55,11 @@ cd paho.mqtt.c
 sudo make install
 
 # 8, make the install libs take effect
+echo "8. run ldconfig"
 sudo ldconfig
 
 # 9, make Baidu Iot Edge SDK
+echo "9. make Baidu Iot Edge SDK"
 cd $BASEDIR
 make all 
 
