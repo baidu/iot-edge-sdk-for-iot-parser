@@ -119,6 +119,24 @@ void char2hex(char c, char* hex1, char* hex2)
     *hex2 = low < 10 ? low + '0' : low - 10 + 'A';
 }
 
+// convert 'A' to 10, or '2' to 2
+char char2dec(char data)
+{
+    if (data >= '0' && data <= '9')
+    {
+        return data - '0';
+    } 
+    else if (data >= 'a' && data <= 'f')
+    {
+        return data - 'a' + 0xa;
+    }
+    else if (data >= 'A' && data <= 'F')
+    {
+        return data - 'A' + 0xa;
+    }
+    return 0;
+}
+
 // convert char* to hex, like 0A126F...
 void byte_arr_to_hex(char* dest, char* src, int len)
 {
@@ -159,3 +177,41 @@ void channel_to_json(Channel* ch, int maxlen, char* dest)
         "{\"endpoint\":\"%s\", \"topic\":\"%s\", \"user\":\"%s\", \"password\":\"%s\"}",
          ch->endpoint, ch->topic, ch->user, ch->password);
 };
+
+// convert "00ff1234" to 0x00ff, 0x1234, ...
+// return the number of data converted
+int char2uint16(uint16_t* dest, const char* src)
+{
+    int len = strlen(src);
+    int i = 0 ;
+    int cnt = 0;
+    for (i = 0; i < len / 4; i++)
+    {
+        uint16_t data = 0;
+        data |= char2dec(src[4 * i]) << 12;
+        data |= char2dec(src[4 * i + 1]) << 8;
+        data |= char2dec(src[4 * i + 2]) << 4;
+        data |= char2dec(src[4 * i + 3]);
+        dest[cnt++] = data;
+    }
+
+    return cnt;
+}
+
+// convert "00ff" to 0x00, 0xff, ....
+// return the number of data converted
+int char2uint8(uint8_t* dest, const char* src)
+{
+    int len = strlen(src);
+    int i = 0 ;
+    int cnt = 0;
+    for (i = 0; i < len / 2; i++)
+    {
+        uint8_t data = 0;
+        data |= char2dec(src[2 * i]) << 4;
+        data |= char2dec(src[2 * i + 1]);
+        dest[cnt++] = data;
+    }
+
+    return cnt;
+}

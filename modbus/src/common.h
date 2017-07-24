@@ -48,4 +48,8 @@ void short_arr_to_array(char* dest, uint16_t* src, int len);
 
 void channel_to_json(Channel* ch, int maxlen, char* dest);
 
+// convert "00ff1234" to 0x00ff, 0x1234 ...
+int char2uint16(uint16_t* dest, const char* src);
+// convert "00ff" to 0x00, 0xff, ....
+int char2uint8(uint8_t* dest, const char* src);
 #endif

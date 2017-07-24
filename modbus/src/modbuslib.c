@@ -247,3 +247,79 @@ void init_modbus_ctxs()
         g_modbus_ctxs[i] = NULL;
     }
 }
+
+/**
+*   write data into the specified slaveid, the slaveid must 
+*   within the slaveis that the gateway is pulling data from
+*
+*   slaveid: the target modbus slave
+*   startAddress: the address of the first register/bit to be written, e.g 40003, 00005
+*   data: the data to write, e.g "00ff12cd", presented as string
+*   
+*   the number of data to write depends on the lenght of data, and the start address.
+*   e.g data="00ff00fe" and startAddress=40001, then 40001,40002 will be written.
+*   e.g data="00ff00fe" and startAddress=00001, the 00001,00002,00003,00004 will be written
+*
+*   return: 0 on sucess, -1 otherwise
+**/
+int write_modbus(int slaveid, int startAddress, char* data)
+{
+    // check if slave is connected or not
+    if (slaveid < 1 || slaveid >= MODBUS_DATA_COUNT)
+    {
+        return -1;
+    }
+    modbus_t* ctx = g_modbus_ctxs[slaveid];
+    if (ctx == NULL)
+    {
+        return -1;
+    }
+
+    // check data
+    if (data == NULL || strlen(data) < 2)
+    {
+        return -1;  // expects at least 2 chars, like "01"
+    }
+
+    int rc = 0;
+
+    // check start address
+    if (startAddress >= 1 && startAddress < 9999)
+    {        
+        uint8_t data8[MAX_MODBUS_DATA_TO_WRITE];
+        int num = char2uint8(data8, data);
+        int startOffset = startAddress - 1;
+        if (num > 0)
+        {
+            rc = modbus_write_bits(ctx, startOffset, num, data8);
+            if (rc == -1)
+            {
+                printf("write bits failed, slaveid=%d, address=%d, data=%s\n", slaveid, startAddress, data);
+                return -1;
+            }
+        }
+        return 0;
+    } 
+    else if (startAddress >= 40001 && startAddress < 49999)
+    {
+        uint16_t data16[MAX_MODBUS_DATA_TO_WRITE];
+        int num = char2uint16(data16, data);
+        int startOffset = startAddress - 40001;
+        if (num > 0)
+        {
+            rc = modbus_write_registers(ctx, startOffset, num, data16);
+            if (rc == -1)
+            {
+                printf("write registers failed, slaveid=%d, address=%d, data=%s\n", slaveid, startAddress, data);
+                return -1;
+            }
+        }
+        return 0;
+    } 
+    else {
+        // invalid start address
+        printf("unsupported address for write:%d\n", startAddress);
+    }
+
+    return -1;
+}

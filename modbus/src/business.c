@@ -41,7 +41,7 @@ int g_gateway_connected = 0;
 pthread_mutex_t g_gateway_mutex = PTHREAD_MUTEX_INITIALIZER;
 int g_mqtt_pos_with_err = -1;
 
-Channel g_gateway_conf;
+GatewayConfig g_gateway_conf;
 char g_buff[BUFF_LEN];
 int g_stop_worker = 0;
 
@@ -142,6 +142,45 @@ int load_channel(Channel* conf)
     mystrncpy(conf->user, cJSON_GetObjectItem(root, "user")->valuestring, MAX_LEN);
     mystrncpy(conf->password, cJSON_GetObjectItem(root, "password")->valuestring, MAX_LEN);
 
+    free(content);
+    cJSON_Delete(root);
+    return 1;
+}
+
+int load_gateway_config(GatewayConfig* conf)
+{
+    if (conf == NULL)
+    {
+        printf("the parameter conf is NULL\n");
+        return 0;
+    }
+    char* content = NULL;
+    long size = read_file_as_string(CONFIG_FILE, &content);
+    if (size <= 0)
+    {
+        printf("failed to open config file %s, while trying to load gateway configuration\n",
+             CONFIG_FILE);
+        return 0;
+    }
+    
+    cJSON* root = cJSON_Parse(content);
+    if (root == NULL)
+    {
+        printf("the config file is not a valid json object, file=%s\n", CONFIG_FILE);
+        return 0;
+    }
+    mystrncpy(conf->endpoint, cJSON_GetObjectItem(root, "endpoint")->valuestring, MAX_LEN);
+    mystrncpy(conf->topic, cJSON_GetObjectItem(root, "topic")->valuestring, MAX_LEN);
+    mystrncpy(conf->user, cJSON_GetObjectItem(root, "user")->valuestring, MAX_LEN);
+    mystrncpy(conf->password, cJSON_GetObjectItem(root, "password")->valuestring, MAX_LEN);
+    // backControlTopic may be missing, or may be null
+    conf->backControlTopic[0] = 0;
+    if (cJSON_HasObjectItem(root, "backControlTopic")) {
+        cJSON* backControlTopicObj = cJSON_GetObjectItem(root, "backControlTopic");
+        if (! cJSON_IsNull(backControlTopicObj)) {
+            mystrncpy(conf->backControlTopic, backControlTopicObj->valuestring, MAX_LEN);
+        }
+    }
     free(content);
     cJSON_Delete(root);
     return 1;
@@ -404,8 +443,12 @@ int msg_arrived(void* context, char* topicName, int topicLen, MQTTClient_message
     {
         return 1;
     }
-    if (strcmp(g_gateway_conf.topic, topicName) != 0)
-    {
+    if (strcmp(g_gateway_conf.topic, topicName) == 0) {
+        return handle_config_msg(context, topicName, topicLen, message);
+    } else if (strlen(g_gateway_conf.backControlTopic) > 0
+        && strcmp(g_gateway_conf.backControlTopic, topicName) == 0) {
+        return handle_back_control_msg(context, topicName, topicLen, message);
+    } else {
         snprintf(g_buff, BUFF_LEN, 
                 "received unrelevant message in command topic, skipping it. topic=%s, payload=", 
                 topicName);
@@ -416,7 +459,64 @@ int msg_arrived(void* context, char* topicName, int topicLen, MQTTClient_message
 
         return 1;
     }
+}
 
+int handle_back_control_msg(void* context, char* topicName, int topicLen, MQTTClient_message* message) {
+    int i = 1;
+    char* payloadptr = NULL;
+
+    payloadptr = message->payload;
+    int buflen = message->payloadlen + 1;
+    char* buf = (char*)malloc(buflen);
+    buf[buflen - 1] = 0;
+    for(i = 0; i<message->payloadlen; i++)
+    {
+        buf[i] = payloadptr[i];
+    }
+
+    MQTTClient_freeMessage(&message);
+    MQTTClient_free(topicName);
+    cJSON* root = cJSON_Parse(buf);
+    if (root == NULL)
+    {
+        free(buf);
+        printf("received invalid json config for writing modbus:%s\n", buf);
+        return 1;
+    }
+    
+    // the control config looks like
+    // {
+    //     "request1": {
+    //         "slaveid": 1,
+    //         "address": 40001,
+    //         "data": "00ff1234"
+    //     },
+    //     "request2": {
+    //         "slaveid": 2,
+    //         "address": 10020,
+    //         "data": "00ff1234"
+    //     }
+    // }
+    char key[11];
+    // lets limit the max data point to write to 100
+    for (i = 1; i <= 100; i++) {
+        sprintf(key, "request%d", i);
+        if (cJSON_HasObjectItem(root, key)) {
+            cJSON* req = cJSON_GetObjectItem(root, key);
+            int slaveid = json_int(req, "slaveid");
+            int address = json_int(req, "address");
+            char* data = json_string(req, "data");
+            write_modbus(slaveid, address, data);
+        } else {
+            break;
+        }
+    }
+
+    cJSON_Delete(root);
+    return 1;
+}
+
+int handle_config_msg(void* context, char* topicName, int topicLen, MQTTClient_message* message) {
     int i = 0;
     char* payloadptr = NULL;
 
@@ -497,7 +597,18 @@ void start_listen_command()
 
         return;
     }
-    MQTTClient_subscribe(client, g_gateway_conf.topic, 0);
+    if (strlen(g_gateway_conf.backControlTopic) > 0) {
+        char* topics[2];
+        topics[0] = g_gateway_conf.topic;
+        topics[1] = g_gateway_conf.backControlTopic;
+        int qoss[2];
+        qoss[0] = 0;
+        qoss[1] = 0;
+        MQTTClient_subscribeMany(client, 2, topics, qoss);
+    } else {
+        MQTTClient_subscribe(client, g_gateway_conf.topic, 0);
+    }
+
     g_gateway_connected = 1;
     pthread_mutex_unlock(&g_gateway_mutex);
 }
@@ -655,7 +766,7 @@ void init_and_start()
     // 3 start execution, modbus read and PUB
 
     // 1 load gateway configuration from local file
-    if (load_channel(&g_gateway_conf))
+    if (load_gateway_config(&g_gateway_conf))
     {
         printf("successfully loaded gateway config from file %s\n", CONFIG_FILE);
     } 

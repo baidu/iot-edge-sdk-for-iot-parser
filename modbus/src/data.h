@@ -32,7 +32,8 @@ enum {
     MAX_CHANNEL = 256, 
     MAX_LEN = 512,
     BUFF_LEN = 2018,
-    ADDR_LEN = 64
+    ADDR_LEN = 64,
+    MAX_MODBUS_DATA_TO_WRITE = 123
 };
 
 // types
@@ -50,6 +51,15 @@ typedef struct
     char user[MAX_LEN];
     char password[MAX_LEN];
 } Channel;
+
+typedef struct
+{
+    char endpoint[MAX_LEN];
+    char topic[MAX_LEN];
+    char user[MAX_LEN];
+    char password[MAX_LEN];
+    char backControlTopic[MAX_LEN];
+} GatewayConfig;
 
 typedef struct SlavePolicy_t
 {
