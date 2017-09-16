@@ -26,6 +26,18 @@ Finally, parsed modbus package is archived into BOS or MQTT topic, for later use
 Installation
 ------------
 
+There are pre-compiled executables under bin directory for a few popular platforms, you may just pick one if any one fits your environemnt, instead of compiling it yourself.
+We have pre-compiled executables for following platforms:
+* linux_x86
+* linux_arm
+* win64
+
+bin目录下有已经针对常见系统，预编译好了可执行程序。如果你的系统包含在内，你可以直接使用可执行文件，而不是自己编译。
+目前针对如下平台做了预编译：
+* linux_x86
+* linux_arm
+* win64
+
 Though this program could work with SSL, people may not need it in
 order to prompt speed and reduce disk requirement, hence we have two
 install guide, for with and without SSL.
@@ -50,10 +62,10 @@ A more detailed step by step guide could be found at [here](https://cloud.baidu.
 1，登录百度天工物解析服务，新建一个网关。新建完成之后，点击网关右侧的**查看密钥**链接，复制对话框中全部内容。
 
 2，按照[文档](https://cloud.baidu.com/doc/Parser/index.html)的提示，继续完成：
-*`网关下面的子设备的创建`
-*`解析项目的创建` （如果希望解析后的数据存入时序数据库，请填写一个**目的地主题**，并且点击**快速创建存储至TSDB的规则引擎**一键创建)
-*`解析设置的创建`
-*`轮询规则的创建`
+* `网关下面的子设备的创建`
+* `解析项目的创建` （如果希望解析后的数据存入时序数据库，请填写一个**目的地主题**，并且点击**快速创建存储至TSDB的规则引擎**一键创建)
+* `解析设置的创建`
+* `轮询规则的创建`
 
 3，回到你的网关程序所在的目录，在bdModbusGateway同级目录下，创建名为gwconfig.txt的文件，并将第1步复制的网关密钥粘贴进文件。文件的格式如下：
 ```
@@ -86,12 +98,16 @@ A more detailed step by step guide could be found at [here](https://cloud.baidu.
         "parsedResponse": null,
         "error": null
     },
-    "timestamp": "2016-10-23 22:07:17-0700"
+    "timestamp": "1505560528"
 }
 ```
 **modbus.request**为采集modbus使用的命令参数。
+
 **modbus.response**为网关采集到的原始modbus数据。
+
 **modbus.parsedResponse**为空，后面经过云端解析后，会填上。
+
+如果你自己需要带上额外的信息，可以修改该SDK，在上传的数据中，加上**misc**字段，该字段格式不限，解析后原样输出。例如，你可以做这里带上设备的其他固有属性。
 
 在云端解析之后，会变成如下格式（填上了modbus.parsedResponse和metrics字段）:
 ```
@@ -125,7 +141,7 @@ A more detailed step by step guide could be found at [here](https://cloud.baidu.
         ],
         "error": null
     },
-    "timestamp": "2016-10-23 22:07:17-0700",
+    "timestamp": "1505560528",
     "metrics": {
         "chiller pressure": 1,
         "water flow": 2
@@ -137,5 +153,5 @@ A more detailed step by step guide could be found at [here](https://cloud.baidu.
 
 如果手工创建规则引擎将解析后的数据写入TSDB，请参考使用如下SQL查询语句：
 ```
- *, 'modbus.parsedResponse' AS _TSDB_META.data_array,  'value' AS _TSDB_META.value_field, 'timestamp' AS _TSDB_META.global_time, 'yyyy-MM-dd hh:mmsZ'  AS _TSDB_META.time_format, 'desc' AS _TSDB_META.point_metric, 'modbus.request.functioncode'  AS _TSDB_META.global_tags.tag1, 'modbus.request.slaveid' AS _TSDB_META.global_tags.tag2,  'gatewayid' AS _TSDB_META.global_tags.tag3
+ *, 'metrics' AS  _TSDB_META_v2.metric_nodes.node1, 'timestamp' AS _TSDB_META_v2.ts, 'modbus.request.functioncode' AS _TSDB_META_v2.tags.tag1, 'modbus.request.slaveid' _TSDB_META_v2.tags.tag2, 'gatewayid' _TSDB_META_v2.tags.tag3, 'yyyy-MM-dd HH:mm:ssZ' AS _TSDB_META_v2.time_format 
 ```
