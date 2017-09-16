@@ -21,7 +21,6 @@
 #define INF_BCE_IOT_MODBUS_SDK_C_DATA_H
 
 #include <time.h>
-#include <pthread.h>
 #include <MQTTClient.h>
 
 // constants

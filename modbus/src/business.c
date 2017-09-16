@@ -20,6 +20,7 @@
 #include "business.h"
 #include "data.h"
 #include "common.h"
+#include "thread.h"
 
 #include <string.h>
 #include <stdlib.h>
@@ -31,19 +32,20 @@ const char* const POLICY_CACHE = "policyCache.txt";
 // when worker is running, it should require this lock first
 // when policy loader is going to change policy, it also need to 
 // acquire this lock first
-pthread_mutex_t g_policy_lock = PTHREAD_MUTEX_INITIALIZER;
+mutex_type g_policy_lock;
 SlavePolicy g_slave_header;    // the pure header node for slave polices
 
 int g_policy_updated = 1;
-pthread_mutex_t g_policy_update_lock = PTHREAD_MUTEX_INITIALIZER;
+mutex_type g_policy_update_lock;
 
 int g_gateway_connected = 0;
-pthread_mutex_t g_gateway_mutex = PTHREAD_MUTEX_INITIALIZER;
+mutex_type g_gateway_mutex;
 int g_mqtt_pos_with_err = -1;
 
 GatewayConfig g_gateway_conf;
 char g_buff[BUFF_LEN];
 int g_stop_worker = 0;
+int g_worker_is_running = 0;
 
 Channel* g_shared_channel[MAX_CHANNEL];
 MQTTClient g_shared_mqtt_client[MAX_CHANNEL];
@@ -349,7 +351,7 @@ int load_slave_policy_from_cache(SlavePolicy* header)
     log_debug("enter loadSlavePolicy");
     int rc = -1;
     // anyway we will clear the flag that need reload policy
-    rc = pthread_mutex_lock(&g_policy_update_lock);
+    rc = Thread_lock_mutex(g_policy_update_lock);
 
     g_policy_updated = 0;
 
@@ -360,7 +362,7 @@ int load_slave_policy_from_cache(SlavePolicy* header)
     {
         printf("failed to open policy cache file %s, skipping policy cache loading\n",
                  POLICY_CACHE);
-        rc = pthread_mutex_unlock(&g_policy_update_lock);
+        rc = Thread_unlock_mutex(g_policy_update_lock);
         return 0;
     }
     if (content == NULL)
@@ -368,7 +370,7 @@ int load_slave_policy_from_cache(SlavePolicy* header)
         return 0;
     }
 
-    rc = pthread_mutex_unlock(&g_policy_update_lock);
+    rc = Thread_unlock_mutex(g_policy_update_lock);
     cJSON* fileroot = cJSON_Parse(content);
     if (fileroot == NULL)
     {
@@ -385,7 +387,7 @@ int load_slave_policy_from_cache(SlavePolicy* header)
         return 1;
     }
 
-    rc = pthread_mutex_lock(&g_policy_lock);
+    rc = Thread_lock_mutex(g_policy_lock);
 
     // clear all the existing data 
     cleanup_data();
@@ -402,7 +404,7 @@ int load_slave_policy_from_cache(SlavePolicy* header)
         policy->next = g_slave_header.next;
         g_slave_header.next = policy;
     }
-    rc = pthread_mutex_unlock(&g_policy_lock);
+    rc = Thread_unlock_mutex(g_policy_lock);
 
     cJSON_Delete(fileroot);
     free(content);
@@ -539,14 +541,14 @@ int handle_config_msg(void* context, char* topicName, int topicLen, MQTTClient_m
         return 1;
     }
     cJSON_Delete(root);
-    pthread_mutex_lock(&g_policy_update_lock);
+    Thread_lock_mutex(g_policy_update_lock);
     FILE* fp = fopen(POLICY_CACHE, "w");
     if (! fp)
     {
         free(buf);
         snprintf(g_buff, BUFF_LEN, "failed to open %s for write", POLICY_CACHE);
         log_debug(g_buff);
-        pthread_mutex_unlock(&g_policy_update_lock);
+        Thread_unlock_mutex(g_policy_update_lock);
         return 0;
     }
     fprintf(fp, "%s", buf);
@@ -555,22 +557,22 @@ int handle_config_msg(void* context, char* topicName, int topicLen, MQTTClient_m
     free(buf);
 
     g_policy_updated = 1;
-    pthread_mutex_unlock(&g_policy_update_lock);
+    Thread_unlock_mutex(g_policy_update_lock);
     return 1;
 }
 
 void connection_lost(void* context, char* cause)
 {
     printf("\nConnection lost, caused by %s, will reconnect later\n", cause);
-    pthread_mutex_lock(&g_gateway_mutex);
+    Thread_lock_mutex(g_gateway_mutex);
     g_gateway_connected = 0;
-    pthread_mutex_unlock(&g_gateway_mutex);
+    Thread_unlock_mutex(g_gateway_mutex);
 }
 
 void start_listen_command()
 {
     printf("connecting gateway to cloud...\n");
-    pthread_mutex_lock(&g_gateway_mutex);
+    Thread_lock_mutex(g_gateway_mutex);
     // sub to config mqtt topic, to receive slave policy from cloud
     MQTTClient client;
     MQTTClient_connectOptions conn_opts = MQTTClient_connectOptions_initializer;
@@ -593,7 +595,7 @@ void start_listen_command()
     if ((rc = MQTTClient_connect(client, &conn_opts)) != MQTTCLIENT_SUCCESS)
     {
         printf("Failed to connect, return code %d\n", rc);
-        pthread_mutex_unlock(&g_gateway_mutex);
+        Thread_unlock_mutex(g_gateway_mutex);
 
         return;
     }
@@ -610,7 +612,7 @@ void start_listen_command()
     }
 
     g_gateway_connected = 1;
-    pthread_mutex_unlock(&g_gateway_mutex);
+    Thread_unlock_mutex(g_gateway_mutex);
 }
 
 void pack_pub_msg(SlavePolicy* policy, char* raw, char* dest)
@@ -632,9 +634,8 @@ void pack_pub_msg(SlavePolicy* policy, char* raw, char* dest)
     cJSON_AddStringToObject(modbus, "response", raw);
     
     time_t now = time(NULL);
-    struct tm* info = localtime(&now);
     char timestamp[40];
-    strftime(timestamp, 39, "%Y-%m-%d %X%z", info);
+    snprintf(timestamp, 39, "%lld", (long long) now);
     cJSON_AddStringToObject(root, "timestamp", timestamp);
     char* text = cJSON_Print(root);
     mystrncpy(dest, text, BUFF_LEN);
@@ -693,8 +694,9 @@ void execute_policy(SlavePolicy* policy)
 }
 
 //TODO: fire up a few more workers, and precess in parallel, to speed up.
-void* worker_func(void* arg)
+static thread_return_type worker_func(void* arg)
 {
+    g_worker_is_running = 1;
     while (g_stop_worker != 1)
     {
         // load slave policy if it's updated
@@ -717,7 +719,7 @@ void* worker_func(void* arg)
         // calculate the new next run, and insert into the list
         time_t now = time(NULL);
         // we have something to do, acquire the lock here
-        int rc = pthread_mutex_lock(&g_policy_lock);
+        int rc = Thread_lock_mutex(g_policy_lock);
         if (g_slave_header.next != NULL && g_slave_header.next->nextRun <= now)
         {    
             while (g_slave_header.next != NULL && g_slave_header.next->nextRun <= now)
@@ -728,22 +730,27 @@ void* worker_func(void* arg)
                 execute_policy(policy);
             }
         }
-        rc = pthread_mutex_unlock(&g_policy_lock);    
+        rc = Thread_unlock_mutex(g_policy_lock);    
 
         sleep(1);
     }
     log_debug("exiting worker thread...\n");
+    g_worker_is_running = 0;
 }
 
-pthread_t g_worker_thread;
+thread_type g_worker_thread;
 
 void start_worker()
 {
-    pthread_create(&g_worker_thread, NULL, worker_func, NULL);
+    g_worker_thread = Thread_start(worker_func, (void*) NULL);
 }
 
 void init_static_data()
 {
+    g_policy_lock = Thread_create_mutex();
+    g_policy_update_lock = Thread_create_mutex();
+    g_gateway_mutex = Thread_create_mutex();
+
     init_modbus_ctxs();
     
     int i = 0; 
@@ -803,6 +810,11 @@ void wait_user_input()
 
 void clean_and_exit()
 {
-    pthread_join(g_worker_thread, NULL);
+    // pthread_join(g_worker_thread, NULL);
+    int count = 0;
+    while (g_worker_is_running == 1 && ++count < 10) {
+        sleep(1);
+    }
+
     cleanup_data();
 }
