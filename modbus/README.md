@@ -167,7 +167,7 @@ A more detailed step by step guide could be found at [here](https://cloud.baidu.
 如果手工创建规则引擎将解析后的数据写入TSDB，请参考使用如下SQL查询语句：
 ```
  *, 'metrics' AS  _TSDB_META_v2.metric_nodes.node1, 'timestamp' AS _TSDB_META_v2.ts, 'modbus.request.functioncode' AS _TSDB_META_v2.tags.tag1, 'modbus.request.slaveid' _TSDB_META_v2.tags.tag2, 'gatewayid' _TSDB_META_v2.tags.tag3, 'yyyy-MM-dd HH:mm:ssZ' AS _TSDB_META_v2.time_format 
-
+```
 
 反控
 ----
@@ -186,4 +186,4 @@ A more detailed step by step guide could be found at [here](https://cloud.baidu.
 }
 一个消息可以包含多个指令，分别用requestx(x为数字编号,1,2,3…n)来表示。slaveid为需要反控的modbus从站编号, address为需要写的寄存器的起始地址，data为要写往modbus从站的数据，从address开始，依次往后写。如上面的request1，会向地址1-8等8个离散值(coins)写数据，写入的值分别为1,1,1,1,0,0,0,0； 上面的request2，会写2个寄存器，40001和40002，写入的值分别为00ff, 1234。
 
-```
+
