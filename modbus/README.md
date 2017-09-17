@@ -172,6 +172,7 @@ A more detailed step by step guide could be found at [here](https://cloud.baidu.
 反控
 ----
 当需要反控的时候，就向backControlTopic发送一条反控指令，反控指令为JSON格式，示例如下：
+```
 {
     "request1": {
         "slaveid": 1,
@@ -184,6 +185,7 @@ A more detailed step by step guide could be found at [here](https://cloud.baidu.
         "data": "00ff1234"
     }
 }
+```
 一个消息可以包含多个指令，分别用requestx(x为数字编号,1,2,3…n)来表示。slaveid为需要反控的modbus从站编号, address为需要写的寄存器的起始地址，data为要写往modbus从站的数据，从address开始，依次往后写。如上面的request1，会向地址1-8等8个离散值(coins)写数据，写入的值分别为1,1,1,1,0,0,0,0； 上面的request2，会写2个寄存器，40001和40002，写入的值分别为00ff, 1234。
 
 
