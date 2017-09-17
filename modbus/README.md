@@ -8,19 +8,23 @@ Baidu modbus gateway is a client program designed to run under user's
 corporation network. It samples modbus data from user's modbus slave
 devices, and upload into the Baidu modbus parser service, to be parsed
 and archived.
+
 百度modbus网关是一个端上的程序，需要运行在用户设备的现场。它采集用户modbus从站的数据，并且上传到百度物解析服务，然后根据解析项目配置的解析设置，进行解析。最后入库。
 
 It receives admins configuration from the cloud via MQTT message, then
 execute the sampling tasks specified in the config, finally upload
 the modbus package to cloud service, via MQTT message again.
+
 他通过定义订阅MQTT主题以接受管理配置（采集策略），然后执行相关的采集任务，采集到数据后，依然通过MQTT协议上数据上传到云端。
 
 Once Baidu modbus parser service receives a modbus package, it parse
 the package according parse rules user specified, so the data becomes
 readable.
+
 云端接受到数据后，根据用户在云端配置的解析设置，将数据解析成明文数据。
 
 Finally, parsed modbus package is archived into BOS or MQTT topic, for later use.
+
 最后，解析后的数据存入BOS，或者另外一个MQTT主题，以便进行后续处理或使用。
 
 Installation
@@ -31,12 +35,14 @@ We have pre-compiled executables for following platforms:
 * linux_x86
 * linux_arm
 * win64
+* win32
 
 bin目录下有已经针对常见系统，预编译好了可执行程序。如果你的系统包含在内，你可以直接使用可执行文件，而不是自己编译。
 目前针对如下平台做了预编译：
 * linux_x86
 * linux_arm
 * win64
+* win32
 
 Though this program could work with SSL, people may not need it in
 order to prompt speed and reduce disk requirement, hence we have two
@@ -48,6 +54,12 @@ For people who want SSL, please refer to withssl/ubuntu-install.sh. Run it like:
 
 For people who don't want SSL, please refer to nossl/ubuntu-install.txt
 对于不需要SSL的用户，请参考nossl/ubuntu-install.sh。像这样运行: ```sudo /bin/bash ubuntu-install.sh```
+
+Cross compilation
+-----------------
+A few cross compilation scripts are located under foler cross-compile, which are provided for your reference. They are tested under ubuntu, and require a few build tools are installed first, which are describted at the beginning of each script.
+
+在cross-compile目录下面，提供了几个常见运行平台的交叉编译脚本，仅供参考。他们在ubuntu下面测试过，并且它们要求系统已经安装了一批编译工具。详细情况在每个脚本的开头有描述。
 
 Documentation
 -------------
@@ -73,7 +85,8 @@ A more detailed step by step guide could be found at [here](https://cloud.baidu.
 "endpoint":"ssl://parser_endpoint1473673432475.mqtt.iot.gz.baidubce.com:1884",
 "topic":"mb_commandTopic_v21493783120844",
 "user":"parser_endpoint1473673432475/mb_thing_v21493783120844",
-"password":"gnPeOWRsoNfakedDonotUsesobJY2+c+VU1UJAAbBnjI="
+"password":"gnPeOWRsoNfakedDonotUsesobJY2+c+VU1UJAAbBnjI=",
+"backControlTopic":"mb_backControlTopic_1493783120844"
 }
 ```
 
@@ -154,4 +167,23 @@ A more detailed step by step guide could be found at [here](https://cloud.baidu.
 如果手工创建规则引擎将解析后的数据写入TSDB，请参考使用如下SQL查询语句：
 ```
  *, 'metrics' AS  _TSDB_META_v2.metric_nodes.node1, 'timestamp' AS _TSDB_META_v2.ts, 'modbus.request.functioncode' AS _TSDB_META_v2.tags.tag1, 'modbus.request.slaveid' _TSDB_META_v2.tags.tag2, 'gatewayid' _TSDB_META_v2.tags.tag3, 'yyyy-MM-dd HH:mm:ssZ' AS _TSDB_META_v2.time_format 
+
+
+反控
+----
+当需要反控的时候，就向backControlTopic发送一条反控指令，反控指令为JSON格式，示例如下：
+{
+    "request1": {
+        "slaveid": 1,
+        "address": 1,
+        "data": "0101010100000000"
+    }，
+    "request2": {
+        "slaveid": 2,
+        "address": 40001,
+        "data": "00ff1234"
+    }
+}
+一个消息可以包含多个指令，分别用requestx(x为数字编号,1,2,3…n)来表示。slaveid为需要反控的modbus从站编号, address为需要写的寄存器的起始地址，data为要写往modbus从站的数据，从address开始，依次往后写。如上面的request1，会向地址1-8等8个离散值(coins)写数据，写入的值分别为1,1,1,1,0,0,0,0； 上面的request2，会写2个寄存器，40001和40002，写入的值分别为00ff, 1234。
+
 ```
