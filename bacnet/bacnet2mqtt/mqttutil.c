@@ -76,7 +76,7 @@ void start_mqtt_client(GlobalVar* vars,
 	printf("sub config from topic:%s\n", vars->g_mqtt_info.configTopic);
 	printf("pub data to topic:%s\n", vars->g_mqtt_info.dataTopic);
 
-	pthread_mutex_lock(&(vars->g_mqtt_client_mutex));
+	Thread_lock_mutex((vars->g_mqtt_client_mutex));
     MQTTClient_connectOptions conn_opts = MQTTClient_connectOptions_initializer;
 
     char clientid[MAX_LEN];
@@ -96,7 +96,7 @@ void start_mqtt_client(GlobalVar* vars,
     if ((rc = MQTTClient_connect(vars->g_mqtt_client, &conn_opts)) != MQTTCLIENT_SUCCESS)
     {
         printf("Failed to connect, return code %d\n", rc);
-        pthread_mutex_unlock(&(vars->g_mqtt_client_mutex));
+        Thread_unlock_mutex((vars->g_mqtt_client_mutex));
 
         return;
     }
@@ -112,7 +112,7 @@ void start_mqtt_client(GlobalVar* vars,
     	MQTTClient_subscribe(vars->g_mqtt_client, vars->g_mqtt_info.configTopic, 0);
 	}
     vars->g_gateway_connected = 1;
-    pthread_mutex_unlock(&(vars->g_mqtt_client_mutex));
+    Thread_unlock_mutex((vars->g_mqtt_client_mutex));
 
     printf("gateway started!\n");
 }
@@ -181,9 +181,9 @@ int sendData(char* data, GlobalVar* vars) {
 			"failed to send a mqtt message, return code=%d. Caching it for later sending", rc);
 		log_debug(LOG_BUFF);
 		putBuffData(data);
-		pthread_mutex_lock(& vars->g_gateway_mutex);
+		Thread_lock_mutex( vars->g_gateway_mutex);
 		vars->g_gateway_connected = 0;
-		pthread_mutex_unlock(& vars->g_gateway_mutex);
+		Thread_unlock_mutex( vars->g_gateway_mutex);
 	}
 
 	return 0;

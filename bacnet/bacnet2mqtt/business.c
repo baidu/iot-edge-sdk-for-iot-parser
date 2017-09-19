@@ -14,6 +14,7 @@ const char* const POLICY_CACHE = "policyCache-bacnet.txt";
 GlobalVar g_vars;
 char g_buff[BUFF_LEN];
 int g_stop_worker = 0;
+int g_worker_is_running = 0;
 
 void load_mqtt_config(const char* file, MqttInfo* pInfo) {
 	printf("starting to load gateway mqtt config from file %s\n", CONFIG_FILE);
@@ -34,9 +35,9 @@ void load_mqtt_config(const char* file, MqttInfo* pInfo) {
 void connection_lost(void* context, char* cause)
 {
     printf("\nConnection lost, caused by %s, will reconnect later\n", cause);
-    pthread_mutex_lock(&(g_vars.g_gateway_mutex));
+    Thread_lock_mutex((g_vars.g_gateway_mutex));
     g_vars.g_gateway_connected = 0;
-    pthread_mutex_unlock(&(g_vars.g_gateway_mutex));
+    Thread_unlock_mutex((g_vars.g_gateway_mutex));
 }
 
 void delivered(void* context, MQTTClient_deliveryToken dt)
@@ -93,14 +94,14 @@ int msg_arrived(void* context, char* topicName, int topicLen, MQTTClient_message
         return 1;
     }
 
-    pthread_mutex_lock(&(g_vars.g_policy_update_lock));
+    Thread_lock_mutex((g_vars.g_policy_update_lock));
     FILE* fp = fopen(POLICY_CACHE, "w");
     if (! fp)
     {
         free(buf);
         snprintf(g_buff, BUFF_LEN, "failed to open %s for write", POLICY_CACHE);
         log_debug(g_buff);
-        pthread_mutex_unlock(&(g_vars.g_policy_update_lock));
+        Thread_unlock_mutex((g_vars.g_policy_update_lock));
         return 0;
     }
     fprintf(fp, "%s", buf);
@@ -109,7 +110,7 @@ int msg_arrived(void* context, char* topicName, int topicLen, MQTTClient_message
     free(buf);
 
     g_vars.g_policy_updated = 1;
-    pthread_mutex_unlock(&(g_vars.g_policy_update_lock));
+    Thread_unlock_mutex((g_vars.g_policy_update_lock));
     return 1;
 }
 
@@ -117,14 +118,14 @@ void load_pull_policy(const char* file, Bac2mqttConfig* pconfig) {
 	printf("start to load data sampling policy from file:%s\n", file);
 
     // anyway we will clear the flag that need reload policy
-    pthread_mutex_lock(&(g_vars.g_policy_update_lock));
+    Thread_lock_mutex((g_vars.g_policy_update_lock));
 
     g_vars.g_policy_updated = 0;
 
     char* content = NULL;
 
     long filesize = read_file_as_string(file, &content);
-    pthread_mutex_unlock(&(g_vars.g_policy_update_lock));
+    Thread_unlock_mutex((g_vars.g_policy_update_lock));
 
     if (filesize <= 0)
     {
@@ -147,11 +148,11 @@ void load_pull_policy(const char* file, Bac2mqttConfig* pconfig) {
 void init_global_vars(GlobalVar* vars) {
 
 	vars->g_gateway_connected = 0;
-	pthread_mutex_init(&(vars->g_mqtt_client_mutex), NULL);// = PTHREAD_MUTEX_INITIALIZER;
+	vars->g_mqtt_client_mutex = Thread_create_mutex();
 
-	pthread_mutex_init(&(vars->g_policy_lock), NULL);// = PTHREAD_MUTEX_INITIALIZER;
+	vars->g_policy_lock = Thread_create_mutex();
 	g_vars.g_policy_updated = 0;
-	pthread_mutex_init(&(vars->g_policy_update_lock), NULL);// = PTHREAD_MUTEX_INITIALIZER;
+	vars->g_policy_update_lock = Thread_create_mutex();
 
 	vars->g_config.rtConfLoaded = 0;	// config not loaded yet
 	vars->g_config.rtDeviceStarted = 0;	// this bacnet device not started yet
@@ -217,8 +218,9 @@ void execute_policy(PullPolicy* policy)
 }
 
 //TODO: fire up a few more workers, and precess in parallel, to speed up.
-void* worker_func(void* arg)
+thread_return_type worker_func(void* arg)
 {
+    g_worker_is_running = 1;	
     while (g_stop_worker != 1)
     {
         // load slave policy if it's updated
@@ -249,7 +251,7 @@ void* worker_func(void* arg)
 		        time_t now = time(NULL);
 		        // we have something to do, acquire the lock here
 		        Bac2mqttConfig* theConfig = &g_vars.g_config;
-		        pthread_mutex_lock(&g_vars.g_policy_lock);
+		        Thread_lock_mutex(g_vars.g_policy_lock);
 		        if (theConfig->policyHeader.next != NULL && theConfig->policyHeader.next->nextRun <= now)
 		        {    
 		            while (theConfig->policyHeader.next != NULL && theConfig->policyHeader.next->nextRun <= now)
@@ -260,21 +262,22 @@ void* worker_func(void* arg)
 		                execute_policy(policy);
 		            }
 		        }
-		        pthread_mutex_unlock(&g_vars.g_policy_lock);   
+		        Thread_unlock_mutex(g_vars.g_policy_lock);   
 	    	}
         } 
 
         sleep_ms(300);
     }
     log_debug("exiting worker thread...\n");
+    g_worker_is_running = 0;
     return NULL;
 }
 
-pthread_t g_worker_thread;
+thread_type g_worker_thread;
 
 void start_worker()
 {
-    pthread_create(&g_worker_thread, NULL, worker_func, NULL);
+    g_worker_thread = Thread_start(worker_func, (void*) NULL);
 }
 
 void init_and_start() {
@@ -335,7 +338,11 @@ void cleanup_data() {
 
 void clean_and_exit()
 {
-    pthread_join(g_worker_thread, NULL);
+    // pthread_join(g_worker_thread, NULL);
+    int count = 0;
+    while (g_worker_is_running == 1 && ++count < 10) {
+        sleep(1);
+    }
     cleanup_data();
 }
 

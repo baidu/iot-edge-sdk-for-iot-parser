@@ -3,12 +3,12 @@
 
 #include <stdint.h>
 #include <time.h>
-#include <pthread.h>
 #include <MQTTClient.h>
 #include <stdlib.h>
 
 #include "bacenum.h"
 #include "bacdef.h"
+#include "thread.h"
 
 // constants
 enum {
@@ -92,17 +92,17 @@ typedef struct
 	MqttInfo g_mqtt_info;
 
 	MQTTClient g_mqtt_client;
-	pthread_mutex_t g_mqtt_client_mutex;
+	mutex_type g_mqtt_client_mutex;
 
 	int g_gateway_connected;
-	pthread_mutex_t g_gateway_mutex;
+	mutex_type g_gateway_mutex;
 
 	// bacnet data sampling config
 	Bac2mqttConfig g_config;
-	pthread_mutex_t g_policy_lock;
+	mutex_type g_policy_lock;
 
 	int g_policy_updated;
-	pthread_mutex_t g_policy_update_lock;
+	mutex_type g_policy_update_lock;
 } GlobalVar;
 
 #endif

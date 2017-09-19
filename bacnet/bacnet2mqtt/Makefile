@@ -23,11 +23,11 @@ BACNET_LIB_TARGET = $(BACNET_LIB_DIR)/lib$(BACNET_LIB_NAME).a
 INCLUDE1 = -I$(BACNET_PORT_DIR) -I$(BACNET_OBJECT) -I$(BACNET_HANDLER)
 INCLUDE2 = -I$(BACNET_INCLUDE)
 INCLUDES = $(INCLUDE1) $(INCLUDE2)
-BACNET_LIB=-L$(BACNET_LIB_DIR),-l$(BACNET_LIB_NAME)
+BACNET_LIB=-L$(BACNET_LIB_DIR) -l$(BACNET_LIB_NAME)
 ifeq (${BACNET_PORT},linux)
 PFLAGS = -pthread
 TARGET_EXT =
-SYSTEM_LIB=-lc,-lgcc,-lrt,-lm
+SYSTEM_LIB=-lc -lgcc -lrt -lm -ldl
 endif
 ifeq (${BACNET_PORT},bsd)
 PFLAGS = -pthread
@@ -36,7 +36,7 @@ SYSTEM_LIB=-lc,-lm
 endif
 ifeq (${BACNET_PORT},win32)
 TARGET_EXT = .exe
-SYSTEM_LIB=-lws2_32,-lgcc,-lm,-liphlpapi,-lwinmm
+SYSTEM_LIB=-lws2_32 -lgcc -lm -liphlpapi -lwinmm
 DEFINES += -D_NO_OLDNAMES
 endif
 #build for release (default) or debug
@@ -47,15 +47,19 @@ OPTIMIZATION = -O0
 DEBUGGING = -g
 endif
 
-LFLAGS_IOT = -lcjson -lm -lpaho-mqtt3c
-ifeq (${WITHSSL},yes)
-LFLAGS_IOT = -lcjson -lm -lpaho-mqtt3cs
+PAHO_LIB =libpaho-mqtt3cs-static.a
+ifeq (${BACNET_PORT},win32)
+  PAHO_LIB =libpaho-mqtt3cs.dll
 endif
 
-# put all the flags together
-CFLAGS := -Wall $(DEBUGGING) $(OPTIMIZATION) $(INCLUDES) $(DEFINES)
-LFLAGS := -Wl,$(BACNET_LIB),$(SYSTEM_LIB),${LFLAGS_IOT}
+IOT_LIB_DIR ?= /usr/local/lib
+LFLAGS_IOT =-L${IOT_LIB_DIR} -l:libcjson.a -l:$(PAHO_LIB) -l:libssl.a -l:libcrypto.a
 
+IOT_INC_DIR ?=/usr/local/include
+
+# put all the flags together
+CFLAGS := -Wall $(DEBUGGING) $(OPTIMIZATION) $(INCLUDES) $(DEFINES) -I $(IOT_INC_DIR) 
+LFLAGS := $(LFLAGS_IOT) $(BACNET_LIB) $(SYSTEM_LIB) 
 
 
 # Executable file name
@@ -72,17 +76,17 @@ OBJS = ${SRCS:.c=.o}
 all: ${BACNET_LIB_TARGET} Makefile ${TARGET_BIN}
 
 ${TARGET_BIN}: ${OBJS} Makefile ${BACNET_LIB_TARGET} $(HEADERS)
-	${CC} ${PFLAGS} ${OBJS} ${LFLAGS} -o $@  
+	${CC} ${PFLAGS}  ${OBJS}  -o $@ ${LFLAGS} 
 	size $@
 	cp $@ ../../
 
 lib: ${BACNET_LIB_TARGET}
 
 ${BACNET_LIB_TARGET}:
-	( cd ${BACNET_LIB_DIR} ; $(MAKE) clean ; $(MAKE) )
+	( cd ${BACNET_LIB_DIR}/.. ; $(MAKE) clean ; $(MAKE) BACNET_PORT=$(BACNET_PORT) library)
 
 .c.o:
-	${CC} -c ${CFLAGS} $*.c -o $@
+	${CC} -c ${CFLAGS}  $*.c -o $@
  
 depend:
 	rm -f .depend
@@ -90,5 +94,6 @@ depend:
 
 clean:
 	rm -rf core ${TARGET_BIN} ${OBJS}  ../../${TARGET_BIN}
-
+	 ( cd ${BACNET_LIB_DIR} ; $(MAKE) clean)
+ 
 include: .depend

@@ -9,10 +9,14 @@
 
 安装
 ----
+bin目录下有已经针对常见系统，预编译好了可执行程序。如果你的系统包含在内，你可以直接使用可执行文件，而不是自己编译。
+目前针对如下平台做了预编译：
+* linux_x86
+* win32
 
-虽然该程序可以使用SSL与百度物接入通信，但你也可以选择不使用SSL加密通信，以减少对SSL库的依赖，以及减少计算量。所以我们有两个安装向导，分别对应需要SSL，和不需要SSL的场景。
-对于需要SSL的用户，请参考ubuntu-install-withssl.sh。如果操作系统是ubuntu，可以这样一键安装： ```sudo /bin/bash ubuntu-install-withssl.sh```
-对于不需要SSL的用户，请参考ubuntu-install-nossl.sh。如果操作系统是ubuntu，可以这样一键安装： ```sudo /bin/bash ubuntu-install-nossl.sh```
+如果你需要自己编译代码，请参考bacnet2mqtt/linux_x86.sh。
+
+如果你希望在linux下交叉编译，请参考bacnet2mqtt/win32.sh。
 
 使用步骤
 -------
