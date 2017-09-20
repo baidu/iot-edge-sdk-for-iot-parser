@@ -93,7 +93,7 @@ depend:
 	${CC} -MM ${CFLAGS} *.c >> .depend
 
 clean:
-	rm -rf core ${TARGET_BIN} ${OBJS}  ../../${TARGET_BIN}
+	rm -rf core ${TARGET_BIN} ${OBJS}  ../../${TARGET_BIN} bdBacnetGateway* ../../bdBacnetGateway* ../../libpaho-mqtt* ../bacnet-stack/src/bip.o ../bacnet-stack/src/bvlc.o ../bacnet-stack/ports/*/bip-init.o
 	 ( cd ${BACNET_LIB_DIR} ; $(MAKE) clean)
  
 include: .depend

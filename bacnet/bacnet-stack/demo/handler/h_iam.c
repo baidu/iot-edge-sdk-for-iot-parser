@@ -102,7 +102,7 @@ void handler_i_am_bind(
     if (len > 0) {
         /* only add address if requested to bind */
         if (max_apdu <= 0) {
-            printf("detected max_apdu=%d, reseting to %d \r\n", max_apdu, MAX_APDU);
+            printf("detected device %d with max_apdu=%d, reseting to %d \r\n", device_id, max_apdu, MAX_APDU);
             max_apdu = MAX_APDU;
         }
         address_add_binding(device_id, max_apdu, src);

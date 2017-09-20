@@ -238,7 +238,7 @@ void My_Read_Property_Multiple_Ack_Handler(
 
                         int actLen = bacapp_snprintf_value(buff, buff_len, &object_value);
                         outval->value = (char*) malloc(actLen + 1);
-                        mystrncpy(outval->value, buff, actLen);
+                        mystrncpy(outval->value, buff, actLen + 1);
 
                         int idLen = sprintf(buff, "inst_%d_%s_%d_%s_%d", outval->instanceNumber, outval->objectType, 
                             outval->objectInstance, outval->propertyId, valueIndex);
