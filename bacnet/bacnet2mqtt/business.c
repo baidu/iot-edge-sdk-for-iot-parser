@@ -332,8 +332,7 @@ void cleanup_data() {
 	g_vars.g_config.policyHeader.next = NULL;
 
 	// clean up bacnet device info
-	freeCharPointer(&g_vars.g_config.device.ip);
-	freeCharPointer(&g_vars.g_config.device.broadcastIp);
+	freeCharPointer(&g_vars.g_config.device.ipOrInterface);
 }
 
 void clean_and_exit()

@@ -68,8 +68,7 @@ PullPolicy* newPullPolicy() ;
 typedef struct 
 {
 	uint32_t instanceNumber;
-	char* ip;	// default NULL
-	char* broadcastIp;	// default NULL
+	char* ipOrInterface;	// default NULL, useful only if there are multiple network adapters
 } BacDevice;
 
 // config

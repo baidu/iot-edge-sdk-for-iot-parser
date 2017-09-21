@@ -343,6 +343,12 @@ int start_local_bacnet_device(Bac2mqttConfig* pconfig) {
     Device_Set_Object_Instance_Number(pconfig->device.instanceNumber);
     address_init();
     Init_Service_Handlers();
+    if (pconfig->device.ipOrInterface != NULL && strlen(pconfig->device.ipOrInterface) > 0) {
+        char env[MAX_LEN];
+        snprintf(env, MAX_LEN, "BACNET_IFACE=%s", pconfig->device.ipOrInterface);
+        putenv(env);
+    }
+    
     dlenv_init();
     atexit(datalink_cleanup);
 

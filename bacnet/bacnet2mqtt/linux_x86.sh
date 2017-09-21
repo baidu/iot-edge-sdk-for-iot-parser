@@ -63,7 +63,7 @@ fi
 
 # 7, download and install paho.mqtt.c
 echo "7, download and install paho.mqtt.c"
-if [ -f $OUTPUTDIR/lib/libpaho-mqtt3cs-static.a]
+if [ -f $OUTPUTDIR/lib/libpaho-mqtt3cs-static.a ]
 then
     echo "$OUTPUTDIR/lib/libpaho-mqtt3cs-static.a exist, skipping paho.mqtt.c compilation"
 else
@@ -86,5 +86,6 @@ fi
 cd $BASEDIR
 make clean
 make IOT_LIB_DIR=$OUTPUTDIR/lib IOT_INC_DIR=$OUTPUTDIR/include CC=$G_CC AR=$G_AR 
+cp bdBacnetGateway ../bin/linux_x86/bdBacnetGateway
 echo "======================================="
-echo "SUCCESS, executable is located at ../../bdBacnetGateway"
+echo "SUCCESS, executable is located at ../bin/linux_x86/bdBacnetGateway"

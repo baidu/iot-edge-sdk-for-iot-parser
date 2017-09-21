@@ -76,25 +76,14 @@ int json2Bac2mqttConfig(const char* str, Bac2mqttConfig* config) {
     // device
     cJSON* device = cJSON_GetObjectItem(root, "device");
     config->device.instanceNumber = (uint32_t) json_int(device, "instanceNumber");
-    config->device.ip = NULL;
-    if (cJSON_HasObjectItem(device, "ip"))
+    config->device.ipOrInterface = NULL;
+    if (cJSON_HasObjectItem(device, "ipOrInterface"))
     {
-    	cJSON* ip = cJSON_GetObjectItem(device, "ip");
+    	cJSON* ip = cJSON_GetObjectItem(device, "ipOrInterface");
     	if (ip != NULL && !cJSON_IsNull(ip)) {
     		char* ipStr = ip->valuestring;
-    		config->device.ip = (char*) malloc(sizeof(char) * strlen(ipStr) + 1);
-    		mystrncpy(config->device.ip, ipStr, MAX_LEN);
-    	}
-    }
-
-    config->device.broadcastIp = NULL;
-    if (cJSON_HasObjectItem(device, "broadcastIp"))
-    {
-    	cJSON* brdcastip = cJSON_GetObjectItem(device, "broadcastIp");
-    	if (brdcastip != NULL && !cJSON_IsNull(brdcastip)) {
-    		char* brdcastipStr = brdcastip->valuestring;
-    		config->device.broadcastIp = (char*) malloc(sizeof(char) * strlen(brdcastipStr) + 1);
-    		mystrncpy(config->device.broadcastIp, brdcastipStr, MAX_LEN);
+    		config->device.ipOrInterface = (char*) malloc(sizeof(char) * strlen(ipStr) + 1);
+    		mystrncpy(config->device.ipOrInterface, ipStr, strlen(ipStr) + 1);
     	}
     }
 
@@ -183,15 +172,10 @@ char* bacData2Json(BacValueOutput* bacDataList, BacDevice* thisDevice, BacValueO
     cJSON* device = NULL;
     cJSON_AddItemToObject(root, "device", device = cJSON_CreateObject());
     cJSON_AddNumberToObject(device, "instanceNumber", thisDevice->instanceNumber);
-    if (thisDevice->ip) {
-        cJSON_AddStringToObject(device, "ip", thisDevice->ip);
+    if (thisDevice->ipOrInterface) {
+        cJSON_AddStringToObject(device, "ipOrInterface", thisDevice->ipOrInterface);
     } else {
-        cJSON_AddItemToObject(device, "ip", cJSON_CreateNull());
-    }
-    if (thisDevice->broadcastIp) {
-        cJSON_AddStringToObject(device, "broadcastIp", thisDevice->broadcastIp);
-    } else {
-        cJSON_AddItemToObject(device, "broadcastIp", cJSON_CreateNull());
+        cJSON_AddItemToObject(device, "ipOrInterface", cJSON_CreateNull());
     }
 
     cJSON_AddNumberToObject(root, "ts", time(NULL));

@@ -59,8 +59,7 @@ bin目录下有已经针对常见系统，预编译好了可执行程序。如�
     "bdBacVer": 1,
     "device": {
         "instanceNumber": 134,
-        "ip": null,
-        "broadcastIp": null
+        "ipOrInterface": null
     },
     "pullPolices": [
         {

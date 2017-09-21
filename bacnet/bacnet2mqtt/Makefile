@@ -78,7 +78,6 @@ all: ${BACNET_LIB_TARGET} Makefile ${TARGET_BIN}
 ${TARGET_BIN}: ${OBJS} Makefile ${BACNET_LIB_TARGET} $(HEADERS)
 	${CC} ${PFLAGS}  ${OBJS}  -o $@ ${LFLAGS} 
 	size $@
-	cp $@ ../../
 
 lib: ${BACNET_LIB_TARGET}
 
@@ -93,7 +92,7 @@ depend:
 	${CC} -MM ${CFLAGS} *.c >> .depend
 
 clean:
-	rm -rf core ${TARGET_BIN} ${OBJS}  ../../${TARGET_BIN} bdBacnetGateway* ../../bdBacnetGateway* ../../libpaho-mqtt* ../bacnet-stack/src/bip.o ../bacnet-stack/src/bvlc.o ../bacnet-stack/ports/*/bip-init.o
+	rm -rf core ${TARGET_BIN} ${OBJS}  ../../${TARGET_BIN} bdBacnetGateway* ../../libpaho-mqtt* ../bacnet-stack/src/bip.o ../bacnet-stack/src/bvlc.o ../bacnet-stack/ports/*/bip-init.o
 	 ( cd ${BACNET_LIB_DIR} ; $(MAKE) clean)
  
 include: .depend

@@ -91,6 +91,7 @@ fi
 cd $BASEDIR
 make clean
 make IOT_LIB_DIR=$OUTPUTDIR/lib IOT_INC_DIR=$OUTPUTDIR/include CC=$G_CC AR=$G_AR BACNET_PORT=win32
-cp $OUTPUTDIR/lib/libpaho-mqtt3cs.dll ../../
+cp $OUTPUTDIR/lib/libpaho-mqtt3cs.dll ../bin/win32/
+cp bdBacnetGateway.exe ../bin/win32/bdBacnetGateway.exe
 echo "======================================="
-echo "SUCCESS, executable is located at ../../bdBacnetGateway.exe"
+echo "SUCCESS, executable is located at ../bin/win32/bdBacnetGateway.exe"
