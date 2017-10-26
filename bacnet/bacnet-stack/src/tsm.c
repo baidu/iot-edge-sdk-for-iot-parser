@@ -64,10 +64,28 @@ static BACNET_TSM_DATA TSM_List[MAX_TSM_TRANSACTIONS];
 /* invoke ID for incrementing between subsequent calls. */
 static uint8_t Current_Invoke_ID = 1;
 
+// my tsm logic
+static bool MY_TSM_LOGIC = false;
+static uint8_t Old_Current_Invoke_ID = 0;
+
+void reset_tsm_logic()
+{
+    if(MY_TSM_LOGIC)
+    {
+        MY_TSM_LOGIC = false;
+        Current_Invoke_ID = Old_Current_Invoke_ID;
+    }
+}
+
 /* returns MAX_TSM_TRANSACTIONS if not found */
 static uint8_t tsm_find_invokeID_index(
     uint8_t invokeID)
 {
+    if(MY_TSM_LOGIC)
+    {
+        return MAX_TSM_TRANSACTIONS;
+    }
+
     unsigned i = 0;     /* counter */
     uint8_t index = MAX_TSM_TRANSACTIONS;       /* return value */
 
@@ -84,6 +102,11 @@ static uint8_t tsm_find_invokeID_index(
 static uint8_t tsm_find_first_free_index(
     void)
 {
+    if(MY_TSM_LOGIC)
+    {
+        return Current_Invoke_ID;
+    }
+
     unsigned i = 0;     /* counter */
     uint8_t index = MAX_TSM_TRANSACTIONS;       /* return value */
 
@@ -100,6 +123,11 @@ static uint8_t tsm_find_first_free_index(
 bool tsm_transaction_available(
     void)
 {
+    if(MY_TSM_LOGIC)
+    {
+        return true;
+    }
+
     bool status = false;        /* return value */
     unsigned i = 0;     /* counter */
 
@@ -184,6 +212,7 @@ uint8_t tsm_next_free_invokeID(
         }
     }
 
+    reset_tsm_logic();
     return invokeID;
 }
 
@@ -335,6 +364,13 @@ bool tsm_invoke_id_failed(
     return status;
 }
 
+void my_tsm_logic_invokeID_set(
+    uint8_t invokeID)
+{
+    MY_TSM_LOGIC = true;
+    Old_Current_Invoke_ID = Current_Invoke_ID;
+    Current_Invoke_ID = invokeID;
+}
 
 #ifdef TEST
 #include <assert.h>

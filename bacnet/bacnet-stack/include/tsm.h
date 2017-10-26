@@ -118,6 +118,9 @@ extern "C" {
     bool tsm_invoke_id_failed(
         uint8_t invokeID);
 
+    void my_tsm_logic_invokeID_set(
+        uint8_t invokeID);
+
 #ifdef __cplusplus
 }
 #endif /* __cplusplus */
