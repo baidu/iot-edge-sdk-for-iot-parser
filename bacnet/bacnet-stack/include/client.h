@@ -112,7 +112,9 @@ extern "C" {
         uint32_t device_id,
         BACNET_SUBSCRIBE_COV_DATA * cov_data);
 
-
+    uint8_t Send_COV_Subscribe_Property(
+        uint32_t device_id,
+        BACNET_SUBSCRIBE_COV_DATA * cov_data);
 
 /* returns the invoke ID for confirmed request, or 0 if failed */
     uint8_t Send_Read_Property_Request_Address(
