@@ -20,15 +20,20 @@ G_LD=i686-w64-mingw32-LD
 
 # 4, make a temp dir
 echo "4, make a temp dir"
-mkdir deps
-cd deps
+DEPS=deps_linux_win32
+mkdir $DEPS
+cd $DEPS
 mkdir cmake
 mkdir output
-OUTPUTDIR=$BASEDIR/deps/output
-DEPSDIR=$BASEDIR/deps
+OUTPUTDIR=$BASEDIR/$DEPS/output
+DEPSDIR=$BASEDIR/$DEPS
 
 # 5, download and install cJSON
 echo "5, download and install cJSON"
+if [ -f $OUTPUTDIR/lib/libcjson.a ]
+then
+    echo "$OUTPUTDIR/lib/libcjson.a exist, skipping cjson compilation"
+else
 wget https://github.com/DaveGamble/cJSON/archive/v1.5.9.tar.gz
 tar zxvf v1.5.9.tar.gz
 cd cmake
@@ -36,9 +41,14 @@ rm -rf *
 cmake -DCMAKE_C_COMPILER=$G_CC -DCMAKE_SYSTEM_NAME=Windows -DCMAKE_SYSTEM_PROCESSOR=x86 -DCMAKE_SYSTEM_VERSION=1 -DBUILD_SHARED_LIBS=Off -DCMAKE_INSTALL_PREFIX=$OUTPUTDIR  -DENABLE_CJSON_TEST=FALSE ../cJSON-1.5.9/
 cmake --build .
 make install
+fi
 
 # 6, download and install libmodbus
 echo "6, download and install libmodbus"
+if [ -f $OUTPUTDIR/lib/libmodbus.a ]
+then
+    echo "$OUTPUTDIR/lib/libmodbus.a exist, skipping libmodbus compilation"
+else
 cd $DEPSDIR
 wget https://github.com/stephane/libmodbus/archive/v3.1.4.tar.gz
 tar zxvf v3.1.4.tar.gz
@@ -46,10 +56,14 @@ cd libmodbus-3.1.4
 ./autogen.sh
 ./configure CC=$G_CC RANLIB=$G_RANLIB LD=$G_RANLIB --host=i686 --enable-static=yes  --prefix=$OUTPUTDIR ac_cv_func_malloc_0_nonnull=yes --without-documentation
 make install
-
+fi
 
 # 7, download and install OpenSSL
 echo "7, download and install OpenSSL"
+if [ -f $OUTPUTDIR/lib/libssl.a ]
+then
+    echo "$OUTPUTDIR/lib/libssl.a exist, skipping openssl compilation"
+else
 cd $DEPSDIR
 wget https://github.com/openssl/openssl/archive/OpenSSL_1_1_0f.tar.gz
 tar zxvf OpenSSL_1_1_0f.tar.gz
@@ -58,9 +72,14 @@ cd openssl-OpenSSL_1_1_0f
 make CC=$G_CC RANLIB=$G_RANLIB LD=$G_LD MAKEDEPPROG=$G_CC PROCESSOR=X86
 cp libssl.a libcrypto.a $OUTPUTDIR/lib
 cp -r include/openssl/ $OUTPUTDIR/include 
+fi
 
 # 8, download and install paho.mqtt.c
 echo "8, download and install paho.mqtt.c"
+if [ -f $OUTPUTDIR/lib/libpaho-mqtt3cs-static.a ]
+then
+    echo "$OUTPUTDIR/lib/libpaho-mqtt3cs-static.a, skipping paho.mqtt.c compilation"
+else
 cd $DEPSDIR
 wget https://github.com/eclipse/paho.mqtt.c/archive/v1.2.0.tar.gz
 tar zxvf v1.2.0.tar.gz
@@ -78,11 +97,13 @@ cp tmp  src/CMakeFiles/paho-mqtt3as.dir/link.txt
 cmake --build .
 cp src/libpaho-mqtt3cs.dll src/libpaho-mqtt3as-static.a $OUTPUTDIR/lib
 cp ../paho.mqtt.c-1.2.0/src/MQTTAsync.h ../paho.mqtt.c-1.2.0/src/MQTTClient.h ../paho.mqtt.c-1.2.0/src/MQTTClientPersistence.h $OUTPUTDIR/include
+fi
 
 # 8, make Baidu Iot Edge SDK
 cd $BASEDIR
 cp Makefile-win Makefile
 make LIBDIR=$OUTPUTDIR/lib INCDIR=$OUTPUTDIR/include CC=$G_CC
 cp $OUTPUTDIR/lib/libpaho-mqtt3cs.dll ../../
+cp ../../bdModbusGateway.exe ../bin/win32
 echo "======================================="
 echo "SUCCESS, executable is located at ../../bdModbusGateway.exe"

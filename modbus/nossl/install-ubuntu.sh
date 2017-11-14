@@ -31,25 +31,36 @@ sudo apt-get --yes --force-yes install libtool
 
 # 4, make a temp dir
 echo "4, make a temp dir"
-mkdir deps
-cd deps
+DEPS=deps_linux_x86
+mkdir $DEPS
+cd $DEPS
 mkdir cmake
 mkdir output
-OUTPUTDIR=$BASEDIR/deps/output
-DEPSDIR=$BASEDIR/deps
+OUTPUTDIR=$BASEDIR/$DEPS/output
+DEPSDIR=$BASEDIR/$DEPS
 
 # 5, download and install cJSON
 echo "5, download and install cJSON"
-wget https://github.com/DaveGamble/cJSON/archive/v1.5.9.tar.gz
+if [ -f $OUTPUTDIR/lib/libcjson.a ]
+then
+    echo "$OUTPUTDIR/lib/libcjson.a exist, skipping cjson compilation"
+else
+cd $DEPSDIR
+wget https://github.com/DaveGamble/cJSON/archive/v1.5.9.tar.gz -O v1.5.9.tar.gz
 tar zxvf v1.5.9.tar.gz
 cd cmake
 rm -rf *
-cmake -DCMAKE_C_COMPILER=gcc -DCMAKE_SYSTEM_NAME=Linux -DCMAKE_SYSTEM_VERSION=1 -DBUILD_SHARED_LIBS=Off -DCMAKE_INSTALL_PREFIX=$OUTPUTDIR  -DENABLE_CJSON_TEST=FALSE ../cJSON-1.5.9/
+cmake -DCMAKE_C_COMPILER=gcc -DCMAKE_SYSTEM_NAME=Linux -DCMAKE_SYSTEM_PROCESSOR=x86 -DCMAKE_SYSTEM_VERSION=1 -DBUILD_SHARED_LIBS=Off -DCMAKE_INSTALL_PREFIX=$OUTPUTDIR  -DENABLE_CJSON_TEST=FALSE ../cJSON-1.5.9/
 cmake --build .
 make install
+fi
 
 # 6, download and install libmodbus
 echo "6, download and install libmodbus"
+if [ -f $OUTPUTDIR/lib/libmodbus.a ]
+then
+    echo "$OUTPUTDIR/lib/libmodbus.a exist, skipping libmodbus compilation"
+else
 cd $DEPSDIR
 wget https://github.com/stephane/libmodbus/archive/v3.1.4.tar.gz
 tar zxvf v3.1.4.tar.gz
@@ -57,18 +68,25 @@ cd libmodbus-3.1.4
 ./autogen.sh
 ./configure CC=gcc --enable-static=yes  --prefix=$OUTPUTDIR
 make install
- 
+fi
+
 # 7, download and install paho.mqtt.c
 echo "7, download and install paho.mqtt.c"
+if [ -f $OUTPUTDIR/lib/libpaho-mqtt3a-static.a ]
+then
+    echo "$OUTPUTDIR/lib/libpaho-mqtt3cs-static.a exist, skipping paho.mqtt.c compilation"
+else
 cd $DEPSDIR
 wget https://github.com/eclipse/paho.mqtt.c/archive/v1.2.0.tar.gz
 tar zxvf v1.2.0.tar.gz
 cd cmake
 rm -rf *
-cmake -DCMAKE_C_COMPILER=gcc -DCMAKE_CXX_COMPILER=g++ -DCMAKE_SYSTEM_NAME=Linux -DCMAKE_SYSTEM_VERSION=1 -DPAHO_WITH_SSL=FALSE -DPAHO_BUILD_STATIC=TRUE ../paho.mqtt.c-1.2.0/
+echo > ../paho.mqtt.c-1.2.0/test/CMakeLists.txt
+cmake -DCMAKE_C_COMPILER=gcc -DCMAKE_CXX_COMPILER=g++ -DCMAKE_SYSTEM_NAME=Linux -DCMAKE_SYSTEM_VERSION=1 -DPAHO_WITH_SSL=FALSE -DPAHO_BUILD_STATIC=TRUE -DPAHO_BUILD_SAMPLES=FALSE ../paho.mqtt.c-1.2.0/
 cmake --build .
 cp src/libpaho-mqtt3a-static.a src/libpaho-mqtt3c-static.a $OUTPUTDIR/lib
 cp ../paho.mqtt.c-1.2.0/src/MQTTAsync.h ../paho.mqtt.c-1.2.0/src/MQTTClient.h ../paho.mqtt.c-1.2.0/src/MQTTClientPersistence.h $OUTPUTDIR/include
+fi
 
 # 8, make Baidu Iot Edge SDK
 cd $BASEDIR

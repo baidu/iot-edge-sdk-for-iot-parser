@@ -43,6 +43,7 @@ mutex_type g_gateway_mutex;
 int g_mqtt_pos_with_err = -1;
 
 GatewayConfig g_gateway_conf;
+cJSON* g_misc = NULL;   // extra info need to pub to cloud in every message, eg. imei
 char g_buff[BUFF_LEN];
 int g_stop_worker = 0;
 int g_worker_is_running = 0;
@@ -183,6 +184,14 @@ int load_gateway_config(GatewayConfig* conf)
             mystrncpy(conf->backControlTopic, backControlTopicObj->valuestring, MAX_LEN);
         }
     }
+
+    if (cJSON_HasObjectItem(root, "misc")) {
+        cJSON* misc = cJSON_GetObjectItem(root, "misc");
+        if (misc != NULL) {
+            g_misc = cJSON_Duplicate(misc, 1);
+        }
+    }
+
     free(content);
     cJSON_Delete(root);
     return 1;
@@ -637,6 +646,12 @@ void pack_pub_msg(SlavePolicy* policy, char* raw, char* dest)
     char timestamp[40];
     snprintf(timestamp, 39, "%lld", (long long) now);
     cJSON_AddStringToObject(root, "timestamp", timestamp);
+
+    // misc
+    if (g_misc != NULL) {
+        cJSON* misc = cJSON_Duplicate(g_misc, 1);
+        cJSON_AddItemToObject(root, "misc", misc);
+    }
     char* text = cJSON_Print(root);
     mystrncpy(dest, text, BUFF_LEN);
     free(text);

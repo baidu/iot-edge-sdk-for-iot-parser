@@ -89,6 +89,20 @@ A more detailed step by step guide could be found at [here](https://cloud.baidu.
 "backControlTopic":"mb_backControlTopic_1493783120844"
 }
 ```
+如果需要网关上报额外的字段（比如设备的imei号等，用来区分不同的物理网关），可以在gwconfig.txt中添加名为misc的对象，其内容可以为任何有效的JSON格式。该网关会在每个上传云端的数据包带上misc对象，并且在解析后的消息中输出。如下所示：
+```
+{
+    "endpoint": "ssl://parser_endpoint1473673432475.mqtt.iot.gz.baidubce.com:1884",
+    "topic": "mb_commandTopic_v21493783120844",
+    "user": "parser_endpoint1473673432475/mb_thing_v21493783120844",
+    "password": "gnPeOWRsoNfakedDonotUsesobJY2+c+VU1UJAAbBnjI=",
+    "backControlTopic": "mb_backControlTopic_1493783120844",
+    "misc": {
+        "imei": "20171113",
+        "anyotherkey": "anyothervalue"
+    }
+}
+```
 
 4，运行bdModbusGateway: ```./bdModbusGateway```
 
