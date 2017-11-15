@@ -202,4 +202,12 @@ A more detailed step by step guide could be found at [here](https://cloud.baidu.
 ```
 一个消息可以包含多个指令，分别用requestx(x为数字编号,1,2,3…n)来表示。slaveid为需要反控的modbus从站编号, address为需要写的寄存器的起始地址，data为要写往modbus从站的数据，从address开始，依次往后写。如上面的request1，会向地址1-8等8个离散值(coins)写数据，写入的值分别为1,1,1,1,0,0,0,0； 上面的request2，会写2个寄存器，40001和40002，写入的值分别为00ff, 1234。
 
+需要说明的是，如果backControlTopic为**mb_backControlTopic_1493783120844**，那么网关对**mb_backControlTopic_1493783120844/#**都是有权限的。也就是说，在gwconfig.txt文件中，把backControlTopic设置成如下主题，都是可以的：
+```
+"backControlTopic": "mb_backControlTopic_1493783120844"
+"backControlTopic": "mb_backControlTopic_1493783120844/a"
+"backControlTopic": "mb_backControlTopic_1493783120844/b"
+...
+"backControlTopic": "mb_backControlTopic_1493783120844/anystring"
+```
 
