@@ -28,7 +28,6 @@ enum {
     UUID_LEN = 38,
     MAX_SLAVE_ID = 247,
     MODBUS_DATA_COUNT = 248,
-    MAX_CHANNEL = 256, 
     MAX_LEN = 512,
     BUFF_LEN = 2018,
     ADDR_LEN = 64,

@@ -211,3 +211,12 @@ A more detailed step by step guide could be found at [here](https://cloud.baidu.
 "backControlTopic": "mb_backControlTopic_1493783120844/anystring"
 ```
 
+离线缓存
+-------
+在网关没有网络的情况下，默认会将采集到的Modbus数据缓存到本地名为data_cache.dat的文件中，最大缓存500MB最新的数据。如果需要修改最大缓存大小，请先删除data_cache.dat文件，然后在gwconfig.txt文件中增加一项名为cacheSize的配置，如下所示，将大小设置成3000000字节：
+```
+{
+    ...
+    "cacheSize": 3000000
+}
+```

@@ -21,6 +21,7 @@
 #include "data.h"
 #include "common.h"
 #include "thread.h"
+#include "mqttsender.h"
 
 #include <string.h>
 #include <stdlib.h>
@@ -28,6 +29,7 @@
 const char* const PEM_FILE = "root_cert.pem";
 const char* const CONFIG_FILE = "gwconfig.txt";
 const char* const POLICY_CACHE = "policyCache.txt";
+const char* const DATA_CACHE = "data_cache.dat";
 
 // when worker is running, it should require this lock first
 // when policy loader is going to change policy, it also need to 
@@ -40,46 +42,16 @@ mutex_type g_policy_update_lock;
 
 int g_gateway_connected = 0;
 mutex_type g_gateway_mutex;
-int g_mqtt_pos_with_err = -1;
 
 GatewayConfig g_gateway_conf;
 cJSON* g_misc = NULL;   // extra info need to pub to cloud in every message, eg. imei
 char g_buff[BUFF_LEN];
 int g_stop_worker = 0;
 int g_worker_is_running = 0;
-
-Channel* g_shared_channel[MAX_CHANNEL];
-MQTTClient g_shared_mqtt_client[MAX_CHANNEL];
+static int g_mqttsender = -1;
+static int g_cache_size = 1024 * 1024 * 500;    // 500 MB,
 
 MQTTClient_SSLOptions g_sslopts = MQTTClient_SSLOptions_initializer;
-
-MQTTClient find_shared_mqtt_client(Channel* ch, int* pos)
-{
-    int i = 0;
-    for (i = 0; i < MAX_CHANNEL; i++)
-    {
-        Channel* pch = g_shared_channel[i];
-        if (pch == NULL)
-        {
-            continue;
-        }
-        if (strcmp(pch->endpoint, ch->endpoint) == 0
-            && strcmp(pch->topic, ch->topic) == 0
-            && strcmp(pch->user, ch->user) == 0
-            && strcmp(pch->password, ch->password) == 0)
-        {
-            if (g_shared_mqtt_client[i] != NULL)
-            {
-                if (pos != NULL)
-                {
-                    *pos = i;
-                }
-                return g_shared_mqtt_client[i];
-            }
-        }
-    }
-    return NULL;
-}
 
 void set_ssl_option(MQTTClient_connectOptions* conn_opts, char* host)
 {
@@ -91,30 +63,6 @@ void set_ssl_option(MQTTClient_connectOptions* conn_opts, char* host)
         g_sslopts.trustStore = PEM_FILE;
         g_sslopts.enableServerCertAuth = 1;
         conn_opts->ssl = &g_sslopts;
-    }
-}
-
-void fix_broken_mqtt_client()
-{
-    if (g_mqtt_pos_with_err >= 0)
-    {
-        Channel* ch = g_shared_channel[g_mqtt_pos_with_err];
-        MQTTClient_connectOptions connect_options = MQTTClient_connectOptions_initializer;
-        char clientid[MAX_LEN];
-        snprintf(clientid, MAX_LEN, "GWPubreconnected%lld", (long long)time(NULL));
-        int rc = MQTTClient_create(&g_shared_mqtt_client[g_mqtt_pos_with_err], ch->endpoint,
-             clientid, MQTTCLIENT_PERSISTENCE_NONE, NULL);
-        connect_options.keepAliveInterval = 20;  // Alive interval
-        connect_options.cleansession = 1;
-        connect_options.username = ch->user;
-        connect_options.password = ch->password;
-        set_ssl_option(&connect_options, ch->endpoint);
-
-        rc = MQTTClient_connect(g_shared_mqtt_client[g_mqtt_pos_with_err], &connect_options);
-        if (rc == MQTTCLIENT_SUCCESS)
-        {
-            g_mqtt_pos_with_err = -1;
-        }
     }
 }
 
@@ -192,6 +140,14 @@ int load_gateway_config(GatewayConfig* conf)
         }
     }
 
+    // g_cache_size
+    if (cJSON_HasObjectItem(root, "cacheSize")) {
+        cJSON* cacheSize = cJSON_GetObjectItem(root, "cacheSize");
+        if (cacheSize != NULL) {
+            g_cache_size = cacheSize->valueint;
+        }
+    }
+
     free(content);
     cJSON_Delete(root);
     return 1;
@@ -209,24 +165,6 @@ SlavePolicy* new_slave_policy()
 
 void cleanup_shared_data()
 {
-    int i = 0;
-    for (i = 0; i < MAX_CHANNEL; i++)
-    {
-        if (g_shared_channel[i] != NULL)
-        {
-            free(g_shared_channel[i]);
-            g_shared_channel[i] = NULL;
-        }
-
-        MQTTClient mqtt_client = g_shared_mqtt_client[i];
-        if (mqtt_client != NULL)
-        {
-            MQTTClient_disconnect(mqtt_client, 5000L);
-            MQTTClient_destroy(&mqtt_client);
-            g_shared_mqtt_client[i] = NULL;
-        }
-    }
-
     cleanup_modbus_ctxs();
 }    
 
@@ -239,71 +177,6 @@ void destroy_slave_policy(SlavePolicy* sp)
     // modbus context is cleaned up in a centralized place (cleanup_shared_data())
 
     free(sp);
-}
-
-void init_mqtt_client_for_policy(SlavePolicy* policy)
-{
-    if (policy == NULL)
-    {
-        return;
-    }
-
-    // look up channle in g_shared_channel first, see if the mqtt client of the same channel
-    // is already created
-    int i = 0;
-    MQTTClient found_client = find_shared_mqtt_client(&policy->pubChannel, &i);
-    if (found_client != NULL)
-    {
-        policy->mqttClient = i;
-        return;
-    }
-    MQTTClient new_client;
-    MQTTClient_connectOptions connect_options = MQTTClient_connectOptions_initializer;
-    char clientid[MAX_LEN];
-    snprintf(clientid, MAX_LEN, "gateway%sslave%d%lld", policy->gatewayid, policy->slaveid, 
-                    (long long)time(NULL));
-    int rc = MQTTClient_create(&new_client, policy->pubChannel.endpoint, clientid,
-                 MQTTCLIENT_PERSISTENCE_NONE, NULL);
-    connect_options.keepAliveInterval = 20;  // Alive interval
-    connect_options.cleansession = 1;
-    connect_options.username = policy->pubChannel.user;
-    connect_options.password = policy->pubChannel.password;
-    set_ssl_option(&connect_options, policy->pubChannel.endpoint);
-
-    rc = MQTTClient_connect(new_client, &connect_options);
-    if (MQTTCLIENT_SUCCESS == rc)
-    {
-        log_debug("successfully create mqtt client for policy");
-        
-        // save the mqtt client for future sharing
-        for (i = 0; i < MAX_CHANNEL; i++)
-        {
-            Channel* pch = g_shared_channel[i];
-            if (pch == NULL)
-            {
-                pch = (Channel*) malloc(sizeof(Channel));
-                mystrncpy(pch->endpoint, policy->pubChannel.endpoint, MAX_LEN);
-                mystrncpy(pch->topic, policy->pubChannel.topic, MAX_LEN);
-                mystrncpy(pch->user, policy->pubChannel.user, MAX_LEN);
-                mystrncpy(pch->password, policy->pubChannel.password, MAX_LEN);
-                
-                g_shared_channel[i] = pch;
-                g_shared_mqtt_client[i] = new_client;
-                policy->mqttClient = i;
-                
-                break;
-            }
-        }
-                
-    } 
-    else 
-    {
-        policy->mqttClient = -1;
-        printf("failed to create slave policy mqtt connection, rc=%d, \
-                slaveid=%d, host=%s clientid=%s, user=%s password=%s", 
-                rc, policy->slaveid, policy->pubChannel.endpoint, clientid, 
-                policy->pubChannel.user, policy->pubChannel.password);
-    }
 }
 
 SlavePolicy* json_to_slave_poilicy(cJSON* root)
@@ -383,7 +256,7 @@ int load_slave_policy_from_cache(SlavePolicy* header)
     cJSON* fileroot = cJSON_Parse(content);
     if (fileroot == NULL)
     {
-        printf("invalid config detected from cache file %s, skipping policy cache loading\n", 
+        printf("invalid config detected from cache file %s, skipping policy cache loading\r\n", 
                 POLICY_CACHE);
         free(content);
         return 0;
@@ -391,7 +264,7 @@ int load_slave_policy_from_cache(SlavePolicy* header)
     int num = cJSON_GetArraySize(fileroot);
     if (num < 0)
     {
-        printf("no slave policy is loaded from cache file %s\n", POLICY_CACHE);
+        printf("no slave policy is loaded from cache file %s\r\n", POLICY_CACHE);
         free(content);
         return 1;
     }
@@ -406,7 +279,6 @@ int load_slave_policy_from_cache(SlavePolicy* header)
     {
         cJSON* root = cJSON_GetArrayItem(fileroot, i);
         SlavePolicy* policy = json_to_slave_poilicy(root);
-        init_mqtt_client_for_policy(policy);
         init_modbus_context(policy);
 
         // add the policy into list
@@ -443,7 +315,7 @@ void insert_slave_policy(SlavePolicy* policy)
 
 void delivered(void* context, MQTTClient_deliveryToken dt)
 {
-    printf("Message with token value %d delivery confirmed\n", dt);
+    printf("Message with token value %d delivery confirmed\r\n", dt);
 }
 
 int msg_arrived(void* context, char* topicName, int topicLen, MQTTClient_message* message)
@@ -491,7 +363,7 @@ int handle_back_control_msg(void* context, char* topicName, int topicLen, MQTTCl
     if (root == NULL)
     {
         free(buf);
-        printf("received invalid json config for writing modbus:%s\n", buf);
+        printf("received invalid json config for writing modbus:%s\r\n", buf);
         return 1;
     }
     
@@ -546,7 +418,7 @@ int handle_config_msg(void* context, char* topicName, int topicLen, MQTTClient_m
     if (root == NULL)
     {
         free(buf);
-        printf("received invalid json config:%s\n", buf);
+        printf("received invalid json config:%s\r\n", buf);
         return 1;
     }
     cJSON_Delete(root);
@@ -562,7 +434,7 @@ int handle_config_msg(void* context, char* topicName, int topicLen, MQTTClient_m
     }
     fprintf(fp, "%s", buf);
     fclose(fp);
-    printf("recived following config:\n%s\n", buf);
+    printf("received gateway config from cloud\r\n");
     free(buf);
 
     g_policy_updated = 1;
@@ -572,7 +444,9 @@ int handle_config_msg(void* context, char* topicName, int topicLen, MQTTClient_m
 
 void connection_lost(void* context, char* cause)
 {
-    printf("\nConnection lost, caused by %s, will reconnect later\n", cause);
+    printf("\nConnection lost, caused by %s, will reconnect later\r\n", cause);
+    MQTTClient client = (MQTTClient) context;
+    MQTTClient_destroy(&client);
     Thread_lock_mutex(g_gateway_mutex);
     g_gateway_connected = 0;
     Thread_unlock_mutex(g_gateway_mutex);
@@ -580,7 +454,7 @@ void connection_lost(void* context, char* cause)
 
 void start_listen_command()
 {
-    printf("connecting gateway to cloud...\n");
+    printf("connecting gateway to cloud...\r\n");
     Thread_lock_mutex(g_gateway_mutex);
     // sub to config mqtt topic, to receive slave policy from cloud
     MQTTClient client;
@@ -593,17 +467,19 @@ void start_listen_command()
     MQTTClient_create(&client, g_gateway_conf.endpoint, clientid,
         MQTTCLIENT_PERSISTENCE_NONE, NULL);
 
-    conn_opts.keepAliveInterval = 50;
+    conn_opts.keepAliveInterval = 20;
     conn_opts.cleansession = 1;
     conn_opts.username = g_gateway_conf.user;
     conn_opts.password = g_gateway_conf.password;
+    conn_opts.connectTimeout = 5;
     set_ssl_option(&conn_opts, g_gateway_conf.endpoint);
 
-    MQTTClient_setCallbacks(client, NULL, connection_lost, msg_arrived, delivered);
+    MQTTClient_setCallbacks(client, client, connection_lost, msg_arrived, delivered);
 
     if ((rc = MQTTClient_connect(client, &conn_opts)) != MQTTCLIENT_SUCCESS)
     {
-        printf("Failed to connect, return code %d\n", rc);
+        MQTTClient_destroy(&client);
+        printf("Failed to connect, return code %d\r\n", rc);
         Thread_unlock_mutex(g_gateway_mutex);
 
         return;
@@ -652,7 +528,7 @@ void pack_pub_msg(SlavePolicy* policy, char* raw, char* dest)
         cJSON* misc = cJSON_Duplicate(g_misc, 1);
         cJSON_AddItemToObject(root, "misc", misc);
     }
-    char* text = cJSON_Print(root);
+    char* text = cJSON_PrintUnformatted(root);
     mystrncpy(dest, text, BUFF_LEN);
     free(text);
     cJSON_Delete(root);
@@ -674,37 +550,20 @@ void execute_policy(SlavePolicy* policy)
     // 1 query modbus data
     char payload[1024];
     read_modbus(policy, payload);
-
     // 2 pub modbus data
-    if (policy->mqttClient != -1 && strlen(payload) > 0)
+    if (strlen(payload) > 0)
     {
-        MQTTClient_message pubmsg = MQTTClient_message_initializer;
-        MQTTClient_deliveryToken delivery_token;
         char msgcontent[BUFF_LEN];
         pack_pub_msg(policy, payload, msgcontent);
-        pubmsg.payload = msgcontent;
-        pubmsg.payloadlen = strlen(msgcontent);
-        pubmsg.qos = 0;
-        pubmsg.retained = 0;
-
-        int rc = MQTTClient_publishMessage(g_shared_mqtt_client[policy->mqttClient],
-                 policy->pubChannel.topic, &pubmsg, &delivery_token);
-        if (rc == MQTTCLIENT_SUCCESS)
-        {
-            MQTTClient_waitForCompletion(g_shared_mqtt_client[policy->mqttClient], 
-                delivery_token, 1000L);
-            log_debug(payload);
-        }
-        else
-        {
-            g_mqtt_pos_with_err = policy->mqttClient;
-            printf("mqtt client at pos %d failed to publish message with rc=%d\n", 
-                g_mqtt_pos_with_err, rc);
-        }
-    }
-    else 
-    {
-        log_debug("failed to init mqtt client");
+        mqtt_send(g_mqttsender, 
+                    policy->pubChannel.endpoint, 
+                    policy->pubChannel.user,
+                    policy->pubChannel.password,
+                    policy->pubChannel.topic,
+                    msgcontent,
+                    strlen(msgcontent),
+                    0,
+                    PEM_FILE); 
     }
 }
 
@@ -725,10 +584,6 @@ static thread_return_type worker_func(void* arg)
             start_listen_command();
         }
 
-        if (g_mqtt_pos_with_err >= 0)
-        {
-            fix_broken_mqtt_client();
-        }
         // iterate from the beginning of the policy list
         // and pick those whose nextRun is due, and execute them, 
         // calculate the new next run, and insert into the list
@@ -749,7 +604,7 @@ static thread_return_type worker_func(void* arg)
 
         sleep(1);
     }
-    log_debug("exiting worker thread...\n");
+    log_debug("exiting worker thread...\r\n");
     g_worker_is_running = 0;
 }
 
@@ -765,20 +620,13 @@ void init_static_data()
     g_policy_lock = Thread_create_mutex();
     g_policy_update_lock = Thread_create_mutex();
     g_gateway_mutex = Thread_create_mutex();
-
-    init_modbus_ctxs();
     
-    int i = 0; 
-    for (i = 0; i < MAX_CHANNEL; i++)
-    {
-        g_shared_channel[i] = NULL;
-        g_shared_mqtt_client[i] = NULL;
-    }
+    init_modbus_ctxs();
 }
 
 void init_and_start()
 {
-    printf("Baidu IoT Edge SDK v0.1.1\n");
+    printf("Baidu IoT Edge SDK v0.2.0\r\n");
 
     init_static_data();
 
@@ -790,13 +638,15 @@ void init_and_start()
     // 1 load gateway configuration from local file
     if (load_gateway_config(&g_gateway_conf))
     {
-        printf("successfully loaded gateway config from file %s\n", CONFIG_FILE);
+        printf("successfully loaded gateway config from file %s\r\n", CONFIG_FILE);
     } 
     else 
     {
-        printf("failed to load gateway configuration from file %s\n", CONFIG_FILE);
+        printf("failed to load gateway configuration from file %s\r\n", CONFIG_FILE);
     }
-                
+    
+    g_mqttsender = new_mqtt_sender(DATA_CACHE, g_cache_size);         
+
     // 2 receive device(slave) polling config from cloud, or local cache
     g_slave_header.next = NULL;
     load_slave_policy_from_cache(&g_slave_header);
@@ -808,7 +658,7 @@ void init_and_start()
 void wait_user_input()
 {
     char ch = '\0';
-    printf("Gateway is running, press 'q' to exit, press 'd' to toggle debug\n");
+    printf("Gateway is running, press 'q' to exit, press 'd' to toggle debug\r\n");
     do 
     {
         ch = getchar();
@@ -831,5 +681,6 @@ void clean_and_exit()
         sleep(1);
     }
 
+    close_mqtt_sender(g_mqttsender);
     cleanup_data();
 }

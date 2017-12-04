@@ -1,5 +1,5 @@
-SOURCES = ../src/modbuslib.c ../src/common.c ../src/business.c ../src/main.c
-HEADERS = ../src/data.h ../src/modbuslib.h ../src/common.h ../src/business.h ../src/thread.h
+SOURCES = ../src/*.c
+HEADERS = ../src/*.h
 CC ?= gcc
 LIBDIR ?= /usr/local/lib
 INCDIR ?= /usr/local/include
