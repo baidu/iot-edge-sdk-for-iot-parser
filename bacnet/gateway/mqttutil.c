@@ -170,6 +170,8 @@ int send_message(uint8_t* data, int data_len, GlobalVar* vars, char* instance_nu
     }
     else
     {
+	// mark the gateway disconnected
+	vars->g_gateway_connected = 0;
         free(topic);
         return -1; // failed to send
     }
