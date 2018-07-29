@@ -312,7 +312,7 @@ void address_init_partial(
 /****************************************************************************
  * Set the TTL info for the given device entry. If it is a bound entry we   *
  * set it to static or normal and can change the TTL. If it is unbound we   *
- * can only set the TTL. This is done as a seperate function at the moment  *
+ * can only set the TTL. This is done as a separate function at the moment  *
  * to avoid breaking the current API.                                       *
  ****************************************************************************/
 
