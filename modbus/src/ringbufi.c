@@ -53,6 +53,7 @@ void saveMeta(RingBuFi* pBuf) {
 		fwrite((const void*)&pBuf->nomanland, sizeof(pBuf->nomanland), 1, pBuf->fp);
 		fwrite((const void*)&pBuf->blockCnt, sizeof(pBuf->blockCnt), 1, pBuf->fp);
 		fwrite((const void*)&pBuf->sizeLimit, sizeof(pBuf->sizeLimit), 1, pBuf->fp);
+		fflush(pBuf->fp);
 	}
 }
 
