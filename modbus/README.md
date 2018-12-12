@@ -220,3 +220,11 @@ A more detailed step by step guide could be found at [here](https://cloud.baidu.
     "cacheSize": 3000000
 }
 ```
+
+断线监控
+-------
+为了指示网关的工作状态，方便监控进程判断网关的工作状态，网关在每次成功地采集数据或者发送数据时，将当前时间写入到对应的文件中去。
+1，当数据采集成功(成功地从Modbus从站读取到数据)，会将当前时间戳写入到如下文件：
+on_modbus_read
+2，当成功将数据通过MQTT协议发送到云端，会将当前时间戳写入到如下文件：
+on_mqtt_sent

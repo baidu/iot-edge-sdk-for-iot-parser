@@ -221,6 +221,8 @@ int read_modbus(SlavePolicy* policy, char* payload)
         g_modbus_ctxs[policy->slaveid] = NULL;
         init_modbus_context(policy);
     }
+
+    return rc;
 }
 
 void cleanup_modbus_ctxs()

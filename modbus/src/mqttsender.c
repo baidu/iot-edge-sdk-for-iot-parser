@@ -503,6 +503,16 @@ static flushIncomingQueueToFile(MqttSender* sender)
 		}
 	}
 }
+
+static void on_mqtt_sent() {
+    FILE* fp = fopen("on_mqtt_sent", "w");
+    if (fp != NULL) {
+        fprintf(fp, "%lld", (long long)time(NULL));
+        fclose(fp);
+    }
+}
+
+
 static thread_return_type worker_func(void* arg)
 {
 	// peek a record if any
@@ -626,6 +636,7 @@ static thread_return_type worker_func(void* arg)
 	        	{
 	        		sendingQueue.next = sendingQueue.next->next;
 					freeMsg(msg);
+					on_mqtt_sent();
 				}
 	        }
 	        else

@@ -534,6 +534,14 @@ void pack_pub_msg(SlavePolicy* policy, char* raw, char* dest)
     cJSON_Delete(root);
 }
 
+static void on_modbus_read() {
+    FILE* fp = fopen("on_modbus_read", "w");
+    if (fp != NULL) {
+        fprintf(fp, "%lld", (long long)time(NULL));
+        fclose(fp);
+    }
+}
+
 void execute_policy(SlavePolicy* policy)
 {
     // 3 recaculate the next run time
@@ -549,7 +557,7 @@ void execute_policy(SlavePolicy* policy)
 
     // 1 query modbus data
     char payload[1024];
-    read_modbus(policy, payload);
+    int rc = read_modbus(policy, payload);
     // 2 pub modbus data
     if (strlen(payload) > 0)
     {
@@ -564,6 +572,9 @@ void execute_policy(SlavePolicy* policy)
                     strlen(msgcontent),
                     0,
                     PEM_FILE); 
+    }
+    if (rc != -1) {
+        on_modbus_read();
     }
 }
 
