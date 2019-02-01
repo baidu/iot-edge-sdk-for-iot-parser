@@ -1012,7 +1012,7 @@ void TL_Local_Time_To_BAC(
  *                                                                          *
  * We take the simple approach here to filling the buffer by taking a max   *
  * size for a single entry and then stopping if there is less than that     *
- * left in the buffer. You could build each entry in a seperate buffer and  *
+ * left in the buffer. You could build each entry in a separate buffer and  *
  * determine the exact length before copying but this is time consuming,    *
  * requires more memory and would probably only let you sqeeeze one more    *
  * entry in on occasion. The value is calculated as 10 bytes for the time   *
