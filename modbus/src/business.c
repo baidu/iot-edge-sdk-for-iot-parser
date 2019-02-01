@@ -637,7 +637,7 @@ void init_static_data()
 
 void init_and_start()
 {
-    printf("Baidu IoT Edge SDK v0.2.0\r\n");
+    printf("Baidu IoT Modbus SDK v0.3.0\r\n");
 
     init_static_data();
 

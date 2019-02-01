@@ -21,10 +21,21 @@
 #define INF_BCE_IOT_MODBUS_SDK_C_MODBUSLIB_H
 
 #include "data.h"
+#include "modbus-rtu-helper.h"
 
 // make modbus connection to modbus slave, and 
 // store the context in g_modbus_ctxs
 void init_modbus_context(SlavePolicy* policy);
+
+modbus_t* init_rtu(SlavePolicy* policy);
+
+modbus_t* init_rtu_internal(SlavePolicy* policy);
+
+void handle_read_modbus_error(SlavePolicy* policy);
+
+void handle_read_modbus_error_internal(SlavePolicy* policy);
+
+void init_modbus_context_win32_rtu(SlavePolicy* policy);
 
 // issue a modbus request to modbus slave, and receive
 // the data into payload.

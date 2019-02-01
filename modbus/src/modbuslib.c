@@ -25,6 +25,7 @@
 #include <modbus/modbus.h>
 
 modbus_t* g_modbus_ctxs[MODBUS_DATA_COUNT];
+ctx_share_helper_t* g_modbus_share_ctxs[WIN_COM_COUNT];
 
 void init_modbus_context(SlavePolicy* policy)
 {
@@ -71,17 +72,7 @@ void init_modbus_context(SlavePolicy* policy)
     }
     else if (policy->mode == RTU)
     {
-        ctx = modbus_new_rtu(policy->ip_com_addr, policy->baud, policy->parity, 
-                policy->databits, policy->stopbits);
-        if (modbus_connect(ctx) == -1) 
-        {
-            fprintf(stderr, "Failed to connect modbus slave: %s, serial port=%s, baud=%d"
-                    " parity=%c, databits=%d, stopbits=%d\n",
-                    modbus_strerror(errno), policy->ip_com_addr, policy->baud, policy->parity,
-                    policy->databits, policy->stopbits);
-            modbus_free(ctx);
-            ctx = NULL ;
-        }
+        ctx = init_rtu(policy);
     }
     else
     {
@@ -94,6 +85,74 @@ void init_modbus_context(SlavePolicy* policy)
         modbus_set_slave(ctx, policy->slaveid);
     }
     g_modbus_ctxs[policy->slaveid] = ctx;
+}
+
+modbus_t* init_rtu(SlavePolicy* policy)
+{
+    modbus_t* ctx = NULL;
+#if defined(_WIN32)
+    /* policy->ip_com_addr should contain a string like "COMxx:", xx being a decimal number */
+    /* extract xx in "COMxx" */
+    int idx = extract_index(policy->ip_com_addr);
+    if (idx == -1) {
+        // required "COMxx", xx being a decimal number and 0 <= xx <= 254
+        return init_rtu_internal(policy);
+    }
+    /* check can be reused */
+    ctx_share_helper_t *helper = g_modbus_share_ctxs[idx];
+    if (helper != NULL)
+    {
+        if (check_params(policy, helper) == 0)
+        {
+            /* reuse */
+            add_slave(policy->slaveid, helper);
+            return helper->share_ctx;
+        }
+        else
+        {
+            // error
+            fprintf(stderr, "Failed to connect modbus slave: %s, parameter error: required same parameter(baud, data_bit ,stop_bit ,parity) when use same COM.",
+                    modbus_strerror(errno));
+            return NULL;
+        }
+    }
+    else
+    {
+        ctx = init_rtu_internal(policy);
+        if (ctx != NULL)
+        {
+            // cache for share
+            helper = create_ctx_share_helper(
+                policy->baud,
+                policy->databits,
+                policy->parity,
+                policy->stopbits,
+                ctx
+            );
+            add_slave(policy->slaveid, helper);
+            g_modbus_share_ctxs[idx] = helper;
+        }
+        return ctx;
+    }
+#endif // defined(_WIN32)
+
+    return init_rtu_internal(policy);
+}
+
+modbus_t* init_rtu_internal(SlavePolicy* policy)
+{
+    modbus_t* ctx = modbus_new_rtu(policy->ip_com_addr, policy->baud, policy->parity, 
+            policy->databits, policy->stopbits);
+    if (modbus_connect(ctx) == -1)
+    {
+        fprintf(stderr, "Failed to connect modbus slave: %s, serial port=%s, baud=%d"
+                " parity=%c, databits=%d, stopbits=%d\n",
+                modbus_strerror(errno), policy->ip_com_addr, policy->baud, policy->parity,
+                policy->databits, policy->stopbits);
+        modbus_free(ctx);
+        ctx = NULL ;
+    }
+    return ctx;
 }
 
 int read_modbus(SlavePolicy* policy, char* payload)
@@ -125,6 +184,8 @@ int read_modbus(SlavePolicy* policy, char* payload)
         fprintf(stderr, "can't make connection to modbus slave#%d\n", policy->slaveid);
         return -1;
     }
+
+    modbus_set_slave(ctx, policy->slaveid);
 
     int start_addr = policy->start_addr;
     int nb = policy->length;
@@ -210,19 +271,114 @@ int read_modbus(SlavePolicy* policy, char* payload)
     
     if (need_reconnect_modbus == 1)
     {
-        if (g_modbus_ctxs[policy->slaveid] != NULL)
-        {
-            // in case there is error when read modbus, we need
-            // to close the current context, otherwise, the 
-            // port/serial port is still be occupied.
-            modbus_close(g_modbus_ctxs[policy->slaveid]);
-            modbus_free(g_modbus_ctxs[policy->slaveid]);
-        }
-        g_modbus_ctxs[policy->slaveid] = NULL;
-        init_modbus_context(policy);
+        handle_read_modbus_error(policy);
     }
 
     return rc;
+}
+
+void handle_read_modbus_error(SlavePolicy* policy)
+{
+#if defined(_WIN32)
+    if (policy->mode == RTU)
+    {
+        init_modbus_context_win32_rtu(policy);
+        return;
+    }
+#endif // defined(_WIN32)
+    handle_read_modbus_error_internal(policy);
+}
+
+void handle_read_modbus_error_internal(SlavePolicy* policy)
+{
+    if (g_modbus_ctxs[policy->slaveid] != NULL)
+    {
+        // in case there is error when read modbus, we need
+        // to close the current context, otherwise, the 
+        // port/serial port is still be occupied.
+        modbus_close(g_modbus_ctxs[policy->slaveid]);
+        modbus_free(g_modbus_ctxs[policy->slaveid]);
+    }
+    g_modbus_ctxs[policy->slaveid] = NULL;
+    init_modbus_context(policy);
+}
+
+void init_modbus_context_win32_rtu(SlavePolicy* policy)
+{
+    if (policy == NULL)
+    {
+        return;
+    }
+
+    int idx = extract_index(policy->ip_com_addr);
+    if (idx == -1) {
+        // required "COMxx", xx being a decimal number and 0 <= xx <= 254
+        handle_read_modbus_error_internal(policy);
+        return;
+    }
+    ctx_share_helper_t* old_helper = g_modbus_share_ctxs[idx];
+    remove_slave(policy->slaveid, old_helper);
+    if (old_helper->slave_list == NULL)
+    {
+        // never share
+        modbus_close(g_modbus_ctxs[policy->slaveid]);
+        modbus_free(g_modbus_ctxs[policy->slaveid]);
+        g_modbus_ctxs[policy->slaveid] = NULL;
+        release_ctx_share_helper(old_helper);
+        old_helper = NULL;
+    }
+
+    // maybe loss connection, try re-connect
+    modbus_t* ctx = modbus_new_rtu(policy->ip_com_addr, policy->baud, policy->parity, 
+                policy->databits, policy->stopbits);
+    if (modbus_connect(ctx) == -1)
+    {
+        // device is closed
+        fprintf(stderr, "Failed to connect modbus slave: %s, serial port=%s, baud=%d"
+                    " parity=%c, databits=%d, stopbits=%d\n",
+                    modbus_strerror(errno), policy->ip_com_addr, policy->baud, policy->parity,
+                    policy->databits, policy->stopbits);
+        modbus_free(ctx);
+        ctx = NULL;
+    }
+    else
+    {
+        // notify all slaves(devices) which use same "COMxx"
+        ctx_share_helper_t* helper = create_ctx_share_helper(
+            policy->baud,
+            policy->databits,
+            policy->parity,
+            policy->stopbits,
+            ctx
+        );
+        add_slave(policy->slaveid, helper);
+
+        // update all
+        if (old_helper != NULL)
+        {
+            slave_id_helper_t* slave_list = old_helper->slave_list;
+            while(slave_list != NULL)
+            {
+                int slaveid = slave_list->slaveid;
+                if (g_modbus_ctxs[slaveid] != NULL)
+                {
+                    add_slave(slaveid, helper);
+                    g_modbus_ctxs[slaveid] = ctx;
+                }
+
+                slave_list = slave_list->next;
+            }
+        }
+
+        g_modbus_share_ctxs[idx] = helper;
+        release_ctx_share_helper(old_helper);
+    }
+
+    if (ctx != NULL)
+    {
+        modbus_set_slave(ctx, policy->slaveid);
+    }
+    g_modbus_ctxs[policy->slaveid] = ctx;
 }
 
 void cleanup_modbus_ctxs()
@@ -239,6 +395,10 @@ void cleanup_modbus_ctxs()
             g_modbus_ctxs[i] = NULL;
         }
     }
+    for (i = 0; i < WIN_COM_COUNT; i++)
+    {
+        release_ctx_share_helper(g_modbus_share_ctxs[i]);
+    }
 }
 
 void init_modbus_ctxs()
@@ -247,6 +407,10 @@ void init_modbus_ctxs()
     for (i = 0; i < MODBUS_DATA_COUNT; i++)
     {
         g_modbus_ctxs[i] = NULL;
+    }
+    for (i = 0; i < WIN_COM_COUNT; i++)
+    {
+        g_modbus_share_ctxs[i] = NULL;
     }
 }
 

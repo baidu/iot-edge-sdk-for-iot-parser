@@ -31,7 +31,8 @@ enum {
     MAX_LEN = 512,
     BUFF_LEN = 2018,
     ADDR_LEN = 64,
-    MAX_MODBUS_DATA_TO_WRITE = 123
+    MAX_MODBUS_DATA_TO_WRITE = 123,
+    WIN_COM_COUNT = 255
 };
 
 // types

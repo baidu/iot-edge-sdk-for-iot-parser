@@ -1,5 +1,5 @@
-SOURCES = ../src/modbuslib.c ../src/common.c ../src/business.c ../src/main.c ../src/ringbufi.c ../src/mqttsender.c
-HEADERS = ../src/data.h ../src/modbuslib.h ../src/common.h ../src/business.h ../src/thread.h ../src/ringbufi.h ../src/mqttsender.h
+SOURCES = ../src/modbuslib.c ../src/common.c ../src/business.c ../src/main.c ../src/ringbufi.c ../src/mqttsender.c ../src/modbus-rtu-helper.c
+HEADERS = ../src/data.h ../src/modbuslib.h ../src/common.h ../src/business.h ../src/thread.h ../src/ringbufi.h ../src/mqttsender.h ../src/modbus-rtu-helper.h
 CC ?= gcc
 LIBDIR ?= /usr/local/lib
 INCDIR ?= /usr/local/include
