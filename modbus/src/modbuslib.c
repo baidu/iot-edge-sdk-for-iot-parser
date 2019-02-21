@@ -398,6 +398,7 @@ void cleanup_modbus_ctxs()
     for (i = 0; i < WIN_COM_COUNT; i++)
     {
         release_ctx_share_helper(g_modbus_share_ctxs[i]);
+        g_modbus_share_ctxs[i] = NULL;
     }
 }
 
