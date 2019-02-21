@@ -90,7 +90,7 @@ void init_modbus_context(SlavePolicy* policy)
 modbus_t* init_rtu(SlavePolicy* policy)
 {
     modbus_t* ctx = NULL;
-#if defined(_WIN32)
+#if defined(_WIN32) || defined(WIN64)
     /* policy->ip_com_addr should contain a string like "COMxx:", xx being a decimal number */
     /* extract xx in "COMxx" */
     int idx = extract_index(policy->ip_com_addr);
@@ -134,7 +134,7 @@ modbus_t* init_rtu(SlavePolicy* policy)
         }
         return ctx;
     }
-#endif // defined(_WIN32)
+#endif // defined(_WIN32) || defined(WIN64)
 
     return init_rtu_internal(policy);
 }
@@ -279,13 +279,13 @@ int read_modbus(SlavePolicy* policy, char* payload)
 
 void handle_read_modbus_error(SlavePolicy* policy)
 {
-#if defined(_WIN32)
+#if defined(_WIN32) || defined(WIN64)
     if (policy->mode == RTU)
     {
         init_modbus_context_win32_rtu(policy);
         return;
     }
-#endif // defined(_WIN32)
+#endif // defined(_WIN32) || defined(WIN64)
     handle_read_modbus_error_internal(policy);
 }
 
